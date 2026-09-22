@@ -28,8 +28,8 @@ if 'staff_list' not in st.session_state:
 if 'store_name_dynamic' not in st.session_state:
     st.session_state['store_name_dynamic'] = "Toko Retail"
 
-if 'global_ai_correction' not in st.session_state:
-    st.session_state['global_ai_correction'] = "Pindahkan ke Top Shelving dan buat Bundling Promo internal khusus brand terkait."
+if 'ai_search_query' not in st.session_state:
+    st.session_state['ai_search_query'] = ""
 
 # Tombol Kembali ke Home di Sidebar
 if st.session_state['step'] > 1:
@@ -42,7 +42,7 @@ st.title("🛡️ E-Smart Guardian: Manajemen ED & Mitigasi Shrinkage")
 st.markdown("---")
 
 # ==========================================
-# TAHAP 1: INPUT/HAPUS STAFF & UPLOAD FILE
+# TAHAP 1: INPUT/HAPUS STAFF & UPLOAD FILE (Mendukung Semua Format Excel & CSV)
 # ==========================================
 if st.session_state['step'] == 1:
     st.markdown("### **Langkah 1 dari 4: Pengaturan Staff & Unggah Data Laporan**")
@@ -72,9 +72,10 @@ if st.session_state['step'] == 1:
             st.warning("Belum ada staff yang ditambahkan.")
 
     st.markdown("---")
+    # Mendukung seluruh format excel (.xlsx, .xls, .xlsb, .xlsm) dan csv
     uploaded_files = st.file_uploader(
-        "Pilih file data laporan dari Pak Yanyan (Maksimal 5 file, .csv / .xlsx):", 
-        type=["csv", "xlsx"], 
+        "Pilih file data laporan (Mendukung SEMUA format Excel & CSV, maks 5 file):", 
+        type=["csv", "xlsx", "xls", "xlsb", "xlsm"], 
         accept_multiple_files=True
     )
 
@@ -88,9 +89,11 @@ if st.session_state['step'] == 1:
                     all_data = []
                     for file in uploaded_files:
                         try:
-                            if file.name.endswith('.csv'):
+                            file_name_lower = file.name.lower()
+                            if file_name_lower.endswith('.csv'):
                                 df_temp = pd.read_csv(file, sep=';', header=1, on_bad_lines='skip', dtype=str)
                             else:
+                                # Mendukung seluruh format file Excel (.xlsx, .xls, .xlsb, dll)
                                 df_temp = pd.read_excel(file, header=1, dtype=str)
                             all_data.append(df_temp)
                         except Exception as e:
@@ -165,7 +168,6 @@ elif st.session_state['step'] == 2:
                 remark_col = next((col for col in filtered_df.columns if 'remark' in col.lower() or 'feedback' in col.lower() or 'instruction' in col.lower()), None)
                 brand_col = next((col for col in raw_df.columns if 'brand' in col.lower()), None)
 
-                # Logika AI Terperinci per Brand dan Kategori
                 def smart_ai_recommendation(row):
                     existing_info = ""
                     if remark_col:
@@ -176,7 +178,7 @@ elif st.session_state['step'] == 2:
                     else:
                         brand_name = str(row[brand_col]) if brand_col else "Produk"
                         cat_name = str(row[cat_col]) if cat_col else "Umum"
-                        return f"Action [{brand_name} - {cat_name}]: Pajang di Top Shelving & Buat Bundling Internal"
+                        return f"Action [{brand_name} - {cat_name}]: Evaluasi display & Optimalkan promosi internal"
 
                 filtered_df['Instruksi_Aksi'] = filtered_df.apply(smart_ai_recommendation, axis=1)
                 st.session_state['filtered_data'] = filtered_df
@@ -185,37 +187,20 @@ elif st.session_state['step'] == 2:
             st.error("Kolom 'Cat' (Category) tidak ditemukan pada struktur file.")
 
 # ==========================================
-# TAHAP 3: REVIEW & KOREKSI GENERAL (OTOMATIS UPDATE ACTION)
+# TAHAP 3: REVIEW & AI SMART SEARCH ENGINE
 # ==========================================
 elif st.session_state['step'] == 3:
-    st.markdown(f"### **Langkah 3 dari 4: Review Data & Koreksi Instruksi General ({st.session_state['store_name_dynamic']})**")
+    st.markdown(f"### **Langkah 3 dari 4: Review Data & AI Smart Search Engine ({st.session_state['store_name_dynamic']})**")
     
-    st.markdown("#### **⚙️ Panel Koreksi / Instruksi General (Global Store)**")
-    st.info("Ubah catatan di bawah ini untuk memperbarui instruksi aksi AI secara otomatis pada tabel.")
+    st.markdown("#### **🔍 AI Smart Search & Filter Engine**")
+    st.info("Ketik kata kunci atau instruksi apa saja pada kotak di bawah ini. Sistem akan otomatis memfilter dan mencarikan data yang sesuai dari seluruh tabel.")
     
-    general_correction = st.text_area(
-        "Masukkan Catatan / Koreksi Instruksi Aksi untuk AI:",
-        value=st.session_state['global_ai_correction'],
-        height=80
+    # Tombol panah / kotak search engine otomatis
+    ai_query = st.text_input(
+        "Ketik kata kunci pencarian / instruksi (Contoh: Mayda, Lip Cream, Top Shelving, Markdown):",
+        value=st.session_state['ai_search_query']
     )
-    
-    # Jika catatan general diubah oleh user, update otomatis kolom Instruksi_Aksi di data
-    if general_correction != st.session_state['global_ai_correction']:
-        st.session_state['global_ai_correction'] = general_correction
-        if 'filtered_data' in st.session_state:
-            brand_col = next((col for col in st.session_state['filtered_data'].columns if 'brand' in col.lower()), None)
-            cat_col = next((col for col in st.session_state['filtered_data'].columns if col.upper() == 'CAT' or 'cat' in col.lower()), None)
-            
-            def update_ai_action(row):
-                remark_col = next((col for col in row.index if 'remark' in col.lower() or 'feedback' in col.lower() or 'instruction' in col.lower()), None)
-                if remark_col and any(kw in str(row[remark_col]).lower() for kw in ['markdown', 'rtw', 'return', 'disetujui', 'approved']):
-                    return row[remark_col]
-                else:
-                    b_name = str(row[brand_col]) if brand_col and brand_col in row else "Produk"
-                    c_name = str(row[cat_col]) if cat_col and cat_col in row else "Umum"
-                    return f"Action [{b_name} - {c_name}]: {general_correction}"
-
-            st.session_state['filtered_data']['Instruksi_Aksi'] = st.session_state['filtered_data'].apply(update_ai_action, axis=1)
+    st.session_state['ai_search_query'] = ai_query
 
     col_nav1, col_nav2 = st.columns(2)
     with col_nav1:
@@ -227,16 +212,16 @@ elif st.session_state['step'] == 3:
             st.session_state['step'] = 4
             st.rerun()
 
-    search_term = st.text_input("🔍 Cari Barang / Kategori / Staff dengan Cepat:")
     current_data = st.session_state['filtered_data']
 
-    if search_term:
-        mask = current_data.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)
+    # Jika ada ketikan di AI Smart Search Engine, otomatis saring baris tabel yang cocok
+    if ai_query:
+        mask = current_data.apply(lambda row: row.astype(str).str.contains(ai_query, case=False).any(), axis=1)
         display_df = current_data[mask]
     else:
         display_df = current_data
 
-    # Filter hanya kolom penting yang diminta
+    # Filter hanya kolom penting yang diminta: Kode Toko, Nama Toko, AM, PLU, Nama Barang, Brand, Cat, Penanggung Jawab, Instruksi AI
     possible_cols = []
     for col in display_df.columns:
         c_low = col.lower()
