@@ -42,7 +42,7 @@ st.title("🛡️ E-Smart Guardian: Manajemen ED & Mitigasi Shrinkage")
 st.markdown("---")
 
 # ==========================================
-# TAHAP 1: INPUT/HAPUS STAFF & UPLOAD FILE (Mendukung Semua Format Excel & CSV)
+# TAHAP 1: INPUT/HAPUS STAFF & UPLOAD FILE
 # ==========================================
 if st.session_state['step'] == 1:
     st.markdown("### **Langkah 1 dari 4: Pengaturan Staff & Unggah Data Laporan**")
@@ -72,9 +72,8 @@ if st.session_state['step'] == 1:
             st.warning("Belum ada staff yang ditambahkan.")
 
     st.markdown("---")
-    # Mendukung seluruh format excel (.xlsx, .xls, .xlsb, .xlsm) dan csv
     uploaded_files = st.file_uploader(
-        "Pilih file data laporan (Mendukung SEMUA format Excel & CSV, maks 5 file):", 
+        "Pilih file data laporan (Mendukung SEMUA format Excel .xlsx, .xlsb, .xls & CSV, maks 5 file):", 
         type=["csv", "xlsx", "xls", "xlsb", "xlsm"], 
         accept_multiple_files=True
     )
@@ -92,8 +91,10 @@ if st.session_state['step'] == 1:
                             file_name_lower = file.name.lower()
                             if file_name_lower.endswith('.csv'):
                                 df_temp = pd.read_csv(file, sep=';', header=1, on_bad_lines='skip', dtype=str)
+                            elif file_name_lower.endswith('.xlsb'):
+                                # Pembacaan khusus format .xlsb menggunakan engine pyxlsb
+                                df_temp = pd.read_excel(file, header=1, engine='pyxlsb', dtype=str)
                             else:
-                                # Mendukung seluruh format file Excel (.xlsx, .xls, .xlsb, dll)
                                 df_temp = pd.read_excel(file, header=1, dtype=str)
                             all_data.append(df_temp)
                         except Exception as e:
@@ -193,9 +194,8 @@ elif st.session_state['step'] == 3:
     st.markdown(f"### **Langkah 3 dari 4: Review Data & AI Smart Search Engine ({st.session_state['store_name_dynamic']})**")
     
     st.markdown("#### **🔍 AI Smart Search & Filter Engine**")
-    st.info("Ketik kata kunci atau instruksi apa saja pada kotak di bawah ini. Sistem akan otomatis memfilter dan mencarikan data yang sesuai dari seluruh tabel.")
+    st.info("Ketik kata kunci atau instruksi apa saja pada kotak di bawah ini untuk memfilter data secara instan.")
     
-    # Tombol panah / kotak search engine otomatis
     ai_query = st.text_input(
         "Ketik kata kunci pencarian / instruksi (Contoh: Mayda, Lip Cream, Top Shelving, Markdown):",
         value=st.session_state['ai_search_query']
@@ -214,14 +214,12 @@ elif st.session_state['step'] == 3:
 
     current_data = st.session_state['filtered_data']
 
-    # Jika ada ketikan di AI Smart Search Engine, otomatis saring baris tabel yang cocok
     if ai_query:
         mask = current_data.apply(lambda row: row.astype(str).str.contains(ai_query, case=False).any(), axis=1)
         display_df = current_data[mask]
     else:
         display_df = current_data
 
-    # Filter hanya kolom penting yang diminta: Kode Toko, Nama Toko, AM, PLU, Nama Barang, Brand, Cat, Penanggung Jawab, Instruksi AI
     possible_cols = []
     for col in display_df.columns:
         c_low = col.lower()
