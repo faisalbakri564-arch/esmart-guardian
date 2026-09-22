@@ -101,7 +101,6 @@ if st.session_state['step'] == 1:
                     
                     if all_data:
                         combined_df = pd.concat(all_data, ignore_index=True)
-                        # Pastikan semua nama kolom diubah menjadi string bersih
                         combined_df.columns = [str(c).strip() for c in combined_df.columns]
                         
                         combined_df = combined_df.loc[:, ~combined_df.columns.str.contains('^Unnamed|^None', case=False, na=False)]
@@ -132,7 +131,6 @@ elif st.session_state['step'] == 2:
     store_code = st.text_input("Masukkan Kode Toko Anda (Contoh: 6849):", value="6849")
     raw_df = st.session_state['raw_data']
     
-    # Pengaman pencarian kolom agar aman dari error tipe data
     code_col = next((col for col in raw_df.columns if 'code' in str(col).lower() or 'site' in str(col).lower()), None)
     site_desc_col = next((col for col in raw_df.columns if 'site desc' in str(col).lower() or 'store' in str(col).lower() or 'desc' in str(col).lower()), None)
 
@@ -221,10 +219,11 @@ elif st.session_state['step'] == 3:
     else:
         display_df = current_data
 
+    # Filter kolom penting yang wajib dimunculkan (termasuk Instruksi_Aksi / AI)
     possible_cols = []
     for col in display_df.columns:
         c_low = str(col).lower()
-        if any(k in c_low for k in ['code', 'site', 'desc', 'am', 'article', 'brand', 'cat', 'staff', 'instruksi']):
+        if any(k in c_low for k in ['code', 'site', 'desc', 'am', 'article', 'brand', 'cat', 'staff', 'instruksi', 'aksi']):
             possible_cols.append(col)
 
     if possible_cols:
@@ -232,7 +231,8 @@ elif st.session_state['step'] == 3:
     else:
         table_view_df = display_df
 
-    st.dataframe(table_view_df, use_container_width=True, height=400)
+    # Menghilangkan nomor urut index di sebelah kiri tabel (hide_index=True)
+    st.dataframe(table_view_df, use_container_width=True, height=400, hide_index=True)
     st.session_state['final_edited_data'] = current_data
 
 # ==========================================
