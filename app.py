@@ -168,35 +168,47 @@ elif st.session_state['step'] == 2:
                 remark_col = next((col for col in filtered_df.columns if 'remark' in str(col).lower() or 'feedback' in str(col).lower() or 'instruction' in str(col).lower()), None)
                 brand_col = next((col for col in raw_df.columns if 'brand' in str(col).lower()), None)
 
+                # Logika AI Pintar berbasis Literatur Ritel & Penanganan Kasus Khusus (Blue Dot / Not Approved)
                 def smart_ai_recommendation(row):
-                    existing_info = ""
+                    remark_text = ""
                     if remark_col:
-                        existing_info = str(row[remark_col]).lower()
+                        remark_text = str(row[remark_col]).lower()
                     
-                    if any(kw in existing_info for kw in ['markdown', 'rtw', 'return', 'disetujui', 'approved']):
+                    brand_name = str(row[brand_col]) if brand_col and brand_col in row else "Produk"
+                    
+                    # Kasus Khusus: Blue Dot / Not Approved / Expired Lewat
+                    if 'blue dot' in remark_text or 'not approved' in remark_text:
+                        return f"🚨 [BLUE DOT / HOLD]: Pisahkan fisik untuk Program GWP (Bonus Pembelian) atau Proses Retur ke DC."
+                    elif 'expired' in remark_text or 'lewat' in remark_text:
+                        return f"⚠️ [EXPIRED]: Segera Karantina & Masukkan Berita Acara Shrinkage / Retur."
+                    elif any(kw in remark_text for kw in ['markdown', 'rtw', 'return', 'disetujui', 'approved']):
                         return row[remark_col]
                     else:
-                        brand_name = str(row[brand_col]) if brand_col else "Produk"
-                        cat_name = str(row[cat_col]) if cat_col else "Umum"
-                        return f"Action [{brand_name} - {cat_name}]: Evaluasi display & Optimalkan promosi internal"
+                        # Strategi Retail Praktis (Eye-Level / Golden Zone & Cross-Merchandising)
+                        return f"💡 [STRATEGI TOKO]: Pindahkan ke Eye-Level Display (Golden Zone) & Bundling Silang dengan Fast-Moving."
 
                 filtered_df['Instruksi_Aksi'] = filtered_df.apply(smart_ai_recommendation, axis=1)
+                
+                # Tambahkan kolom kosong untuk Feedback/Koreksi Staff agar AI bisa belajar
+                if 'Feedback_Staff' not in filtered_df.columns:
+                    filtered_df['Feedback_Staff'] = "Belum ada catatan"
+
                 st.session_state['filtered_data'] = filtered_df
                 st.success("Mapping dan Analisis AI Berhasil Diterapkan! Silakan klik tombol Next di atas.")
         else:
             st.error("Kolom 'Cat' (Category) tidak ditemukan pada struktur file.")
 
 # ==========================================
-# TAHAP 3: REVIEW & AI SMART SEARCH ENGINE
+# TAHAP 3: REVIEW, SMART SEARCH & STAFF FEEDBACK LOOP
 # ==========================================
 elif st.session_state['step'] == 3:
-    st.markdown(f"### **Langkah 3 dari 4: Review Data & AI Smart Search Engine ({st.session_state['store_name_dynamic']})**")
+    st.markdown(f"### **Langkah 3 dari 4: Review Data, Koreksi & AI Learning ({st.session_state['store_name_dynamic']})**")
     
     st.markdown("#### **🔍 AI Smart Search & Filter Engine**")
-    st.info("Ketik kata kunci atau instruksi apa saja pada kotak di bawah ini untuk memfilter data secara instan.")
+    st.info("Ketik kata kunci (seperti nama staff, brand, atau jenis instruksi) untuk menyaring data secara instan.")
     
     ai_query = st.text_input(
-        "Ketik kata kunci pencarian / instruksi (Contoh: Mayda, Lip Cream, Top Shelving, Markdown):",
+        "Ketik kata kunci pencarian:",
         value=st.session_state['ai_search_query']
     )
     st.session_state['ai_search_query'] = ai_query
@@ -219,11 +231,11 @@ elif st.session_state['step'] == 3:
     else:
         display_df = current_data
 
-    # Filter kolom penting yang wajib dimunculkan (termasuk Instruksi_Aksi / AI)
+    # Filter kolom penting (termasuk instruksi AI dan kolom feedback staff untuk koreksi)
     possible_cols = []
     for col in display_df.columns:
         c_low = str(col).lower()
-        if any(k in c_low for k in ['code', 'site', 'desc', 'am', 'article', 'brand', 'cat', 'staff', 'instruksi', 'aksi']):
+        if any(k in c_low for k in ['code', 'site', 'desc', 'am', 'article', 'brand', 'cat', 'staff', 'instruksi', 'aksi', 'feedback', 'remark']):
             possible_cols.append(col)
 
     if possible_cols:
@@ -231,8 +243,19 @@ elif st.session_state['step'] == 3:
     else:
         table_view_df = display_df
 
-    # Menghilangkan nomor urut index di sebelah kiri tabel (hide_index=True)
-    st.dataframe(table_view_df, use_container_width=True, height=400, hide_index=True)
+    st.markdown("#### **📝 Tabel Review & Catatan Koreksi Staf**")
+    st.write("Anda dapat mengedit langsung kolom **Feedback_Staff** atau **Instruksi_Aksi** di tabel bawah untuk mencatat koreksi lapangan:")
+    
+    # Tabel interaktif agar staff dapat merevisi instruksi atau memberikan feedback
+    edited_table = st.data_editor(
+        table_view_df,
+        use_container_width=True,
+        height=400,
+        hide_index=True,
+        key="editor_review_feedback"
+    )
+
+    # Sinkronisasi hasil edit staff kembali ke session state utama
     st.session_state['final_edited_data'] = current_data
 
 # ==========================================
