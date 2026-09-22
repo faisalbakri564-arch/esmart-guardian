@@ -118,14 +118,11 @@ if st.session_state['step'] == 1:
 elif st.session_state['step'] == 2:
     st.markdown("### **Langkah 2 dari 4: Masukkan Kode Toko & Mapping Tanggung Jawab Staff (By Category)**")
     
-    col_nav1, col_nav2 = st.columns(2)
+    # Tombol Back saja di atas
+    col_nav1, _ = st.columns([1, 4])
     with col_nav1:
         if st.button("⬅️ Back"):
             st.session_state['step'] = 1
-            st.rerun()
-    with col_nav2:
-        if st.button("Next ➡️"):
-            st.session_state['step'] = 3
             st.rerun()
 
     store_code = st.text_input("Masukkan Kode Toko Anda (Contoh: 6849):", value="")
@@ -163,7 +160,14 @@ elif st.session_state['step'] == 2:
                 for cat in unique_cats: 
                     mapping_input[cat] = st.selectbox(f"Staff untuk Kategori: **{cat}**", st.session_state['staff_list'], key=f"map_cat_{cat}")
 
-                if st.button("🚀 Terapkan Mapping Category & Jalankan AI"):
+                # Tombol Aksi di Bawah (Terapkan Mapping & Next Berdampingan)
+                col_act1, col_act2 = st.columns(2)
+                with col_act1:
+                    btn_apply = st.button("🚀 Terapkan Mapping Category & Jalankan AI")
+                with col_act2:
+                    btn_next_step = st.button("Next ➡️ (Lanjut ke Review)")
+
+                if btn_apply:
                     filtered_df['Staff_Penanggung_Jawab'] = filtered_df[cat_col].map(mapping_input).fillna("Belum Ditugaskan")
                     
                     remark_col = next((col for col in filtered_df.columns if 'remark' in str(col).lower() or 'feedback' in str(col).lower() or 'instruction' in str(col).lower()), None)
@@ -173,8 +177,6 @@ elif st.session_state['step'] == 2:
                         remark_text = ""
                         if remark_col:
                             remark_text = str(row[remark_col]).lower()
-                        
-                        brand_name = str(row[brand_col]) if brand_col and brand_col in row else "Produk"
                         
                         if 'expired' in remark_text or 'lewat' in remark_text:
                             return f"⚠️ [EXPIRED LEWAT]: Segera ajukan ajuan WO tambahan."
@@ -191,14 +193,21 @@ elif st.session_state['step'] == 2:
                         filtered_df['Feedback_Staff'] = "Belum ada catatan"
 
                     st.session_state['filtered_data'] = filtered_df
-                    st.success("Mapping dan Analisis AI Berhasil Diterapkan! Silakan klik tombol Next di atas.")
+                    st.success("Mapping dan Analisis AI Berhasil Diterapkan!")
+
+                if btn_next_step:
+                    if 'filtered_data' in st.session_state:
+                        st.session_state['step'] = 3
+                        st.rerun()
+                    else:
+                        st.warning("Harap klik tombol 'Terapkan Mapping Category & Jalankan AI' terlebih dahulu.")
             else:
                 st.error("Kolom 'Cat' (Category) tidak ditemukan pada struktur file.")
     else:
         st.info("👆 Silakan masukkan Kode Toko di atas untuk memunculkan data dan opsi mapping.")
 
 # ==========================================
-# TAHAP 3: REVIEW, SMART SEARCH & HANYA FEEDBACK STAFF YANG BISA DIEDIT
+# TAHAP 3: REVIEW, SMART SEARCH & FEEDBACK
 # ==========================================
 elif st.session_state['step'] == 3:
     st.markdown(f"### **Langkah 3 dari 4: Review Data & Koreksi Staf ({st.session_state['store_name_dynamic']})**")
@@ -242,7 +251,6 @@ elif st.session_state['step'] == 3:
         st.markdown("#### **📝 Tabel Review & Catatan Koreksi Staf**")
         st.info("💡 Anda hanya dapat mengedit kolom **Feedback_Staff** di tabel bawah. Kolom lainnya terkunci agar aman.")
 
-        # Konfigurasi agar HANYA kolom Feedback_Staff yang bisa diedit (disabled untuk kolom lain)
         column_config = {}
         for col in table_view_df.columns:
             if col != 'Feedback_Staff':
@@ -257,7 +265,6 @@ elif st.session_state['step'] == 3:
             key="editor_review_feedback"
         )
 
-        # Simpan hasil editan staf pada kolom Feedback_Staff ke data utama secara permanen
         for idx in edited_table.index:
             if idx in current_data.index:
                 current_data.at[idx, 'Feedback_Staff'] = edited_table.at[idx, 'Feedback_Staff']
