@@ -113,7 +113,7 @@ if st.session_state['step'] == 1:
                 st.warning("Harap unggah file terlebih dahulu.")
 
 # ==========================================
-# TAHAP 2: KODE TOKO & MAPPING STAFF (BY CATEGORY)
+# TAHAP 2: KODE TOKO KOSONG & MAPPING STAFF
 # ==========================================
 elif st.session_state['step'] == 2:
     st.markdown("### **Langkah 2 dari 4: Masukkan Kode Toko & Mapping Tanggung Jawab Staff (By Category)**")
@@ -128,84 +128,85 @@ elif st.session_state['step'] == 2:
             st.session_state['step'] = 3
             st.rerun()
 
-    store_code = st.text_input("Masukkan Kode Toko Anda (Contoh: 6849):", value="6849")
-    raw_df = st.session_state['raw_data']
+    # Kotak input kode toko dibuat kosong (value="") agar diisi mandiri
+    store_code = st.text_input("Masukkan Kode Toko Anda (Contoh: 6849):", value="")
     
-    code_col = next((col for col in raw_df.columns if 'code' in str(col).lower() or 'site' in str(col).lower()), None)
-    site_desc_col = next((col for col in raw_df.columns if 'site desc' in str(col).lower() or 'store' in str(col).lower() or 'desc' in str(col).lower()), None)
+    if store_code:
+        raw_df = st.session_state['raw_data']
+        code_col = next((col for col in raw_df.columns if 'code' in str(col).lower() or 'site' in str(col).lower()), None)
+        site_desc_col = next((col for col in raw_df.columns if 'site desc' in str(col).lower() or 'store' in str(col).lower() or 'desc' in str(col).lower()), None)
 
-    if code_col:
-        filtered_df = raw_df[raw_df[code_col].astype(str).str.contains(store_code, na=False)].copy()
-        if site_desc_col and not filtered_df.empty:
-            st.session_state['store_name_dynamic'] = str(filtered_df[site_desc_col].iloc[0])
+        if code_col:
+            filtered_df = raw_df[raw_df[code_col].astype(str).str.contains(store_code, na=False)].copy()
+            if site_desc_col and not filtered_df.empty:
+                st.session_state['store_name_dynamic'] = str(filtered_df[site_desc_col].iloc[0])
+            else:
+                st.session_state['store_name_dynamic'] = f"Toko Kode {store_code}"
         else:
+            filtered_df = raw_df.copy()
             st.session_state['store_name_dynamic'] = f"Toko Kode {store_code}"
-    else:
-        filtered_df = raw_df.copy()
-        st.session_state['store_name_dynamic'] = f"Toko Kode {store_code}"
 
-    st.success(f"🏢 Toko Terdeteksi: **{st.session_state['store_name_dynamic']}** (Total Data: {len(filtered_df)} baris)")
+        st.success(f"🏢 Toko Terdeteksi: **{st.session_state['store_name_dynamic']}** (Total Data: {len(filtered_df)} baris)")
 
-    st.markdown("---")
-    st.markdown("#### **Mapping Penanggung Jawab Berdasarkan Kategori (Category)**")
-    
-    if not st.session_state['staff_list']:
-        st.warning("⚠️ Belum ada nama staff yang dimasukkan. Harap kembali ke Langkah 1 dan tambahkan minimal 1 nama staff.")
-    else:
-        cat_col = next((col for col in raw_df.columns if str(col).upper() == 'CAT' or 'cat' in str(col).lower()), None)
+        st.markdown("---")
+        st.markdown("#### **Mapping Penanggung Jawab Berdasarkan Kategori (Category)**")
         
-        if cat_col:
-            unique_cats = filtered_df[cat_col].dropna().unique()
-            mapping_input = {}
-            
-            st.info(f"Ditemukan {len(unique_cats)} Kategori produk. Silakan tentukan penanggung jawabnya:")
-            for cat in unique_cats: 
-                mapping_input[cat] = st.selectbox(f"Staff untuk Kategori: **{cat}**", st.session_state['staff_list'], key=f"map_cat_{cat}")
-
-            if st.button("🚀 Terapkan Mapping Category & Jalankan AI"):
-                filtered_df['Staff_Penanggung_Jawab'] = filtered_df[cat_col].map(mapping_input).fillna("Belum Ditugaskan")
-                
-                remark_col = next((col for col in filtered_df.columns if 'remark' in str(col).lower() or 'feedback' in str(col).lower() or 'instruction' in str(col).lower()), None)
-                brand_col = next((col for col in raw_df.columns if 'brand' in str(col).lower()), None)
-
-                # Logika AI Pintar berbasis Literatur Ritel & Penanganan Kasus Khusus (Blue Dot / Not Approved)
-                def smart_ai_recommendation(row):
-                    remark_text = ""
-                    if remark_col:
-                        remark_text = str(row[remark_col]).lower()
-                    
-                    brand_name = str(row[brand_col]) if brand_col and brand_col in row else "Produk"
-                    
-                    # Kasus Khusus: Blue Dot / Not Approved / Expired Lewat
-                    if 'blue dot' in remark_text or 'not approved' in remark_text:
-                        return f"🚨 [BLUE DOT / HOLD]: Pisahkan fisik untuk Program GWP (Bonus Pembelian) atau Proses Retur ke DC."
-                    elif 'expired' in remark_text or 'lewat' in remark_text:
-                        return f"⚠️ [EXPIRED]: Segera Karantina & Masukkan Berita Acara Shrinkage / Retur."
-                    elif any(kw in remark_text for kw in ['markdown', 'rtw', 'return', 'disetujui', 'approved']):
-                        return row[remark_col]
-                    else:
-                        # Strategi Retail Praktis (Eye-Level / Golden Zone & Cross-Merchandising)
-                        return f"💡 [STRATEGI TOKO]: Pindahkan ke Eye-Level Display (Golden Zone) & Bundling Silang dengan Fast-Moving."
-
-                filtered_df['Instruksi_Aksi'] = filtered_df.apply(smart_ai_recommendation, axis=1)
-                
-                # Tambahkan kolom kosong untuk Feedback/Koreksi Staff agar AI bisa belajar
-                if 'Feedback_Staff' not in filtered_df.columns:
-                    filtered_df['Feedback_Staff'] = "Belum ada catatan"
-
-                st.session_state['filtered_data'] = filtered_df
-                st.success("Mapping dan Analisis AI Berhasil Diterapkan! Silakan klik tombol Next di atas.")
+        if not st.session_state['staff_list']:
+            st.warning("⚠️ Belum ada nama staff yang dimasukkan. Harap kembali ke Langkah 1 dan tambahkan minimal 1 nama staff.")
         else:
-            st.error("Kolom 'Cat' (Category) tidak ditemukan pada struktur file.")
+            cat_col = next((col for col in raw_df.columns if str(col).upper() == 'CAT' or 'cat' in str(col).lower()), None)
+            
+            if cat_col:
+                unique_cats = filtered_df[cat_col].dropna().unique()
+                mapping_input = {}
+                
+                st.info(f"Ditemukan {len(unique_cats)} Kategori produk. Silakan tentukan penanggung jawabnya:")
+                for cat in unique_cats: 
+                    mapping_input[cat] = st.selectbox(f"Staff untuk Kategori: **{cat}**", st.session_state['staff_list'], key=f"map_cat_{cat}")
+
+                if st.button("🚀 Terapkan Mapping Category & Jalankan AI"):
+                    filtered_df['Staff_Penanggung_Jawab'] = filtered_df[cat_col].map(mapping_input).fillna("Belum Ditugaskan")
+                    
+                    remark_col = next((col for col in filtered_df.columns if 'remark' in str(col).lower() or 'feedback' in str(col).lower() or 'instruction' in str(col).lower()), None)
+                    brand_col = next((col for col in raw_df.columns if 'brand' in str(col).lower()), None)
+
+                    def smart_ai_recommendation(row):
+                        remark_text = ""
+                        if remark_col:
+                            remark_text = str(row[remark_col]).lower()
+                        
+                        brand_name = str(row[brand_col]) if brand_col and brand_col in row else "Produk"
+                        
+                        # Aturan AI khusus berdasarkan remark
+                        if 'expired' in remark_text or 'lewat' in remark_text:
+                            return f"⚠️ [EXPIRED LEWAT]: Segera ajukan ajuan WO tambahan."
+                        elif 'blue dot' in remark_text or 'not approved' in remark_text:
+                            return f"🚨 [BLUE DOT / HOLD]: Pisahkan fisik untuk Program GWP atau Retur ke DC."
+                        elif any(kw in remark_text for kw in ['markdown', 'rtw', 'return', 'disetujui', 'approved']):
+                            return row[remark_col]
+                        else:
+                            return f"💡 [STRATEGI TOKO]: Pindahkan ke Eye-Level Display & Bundling Silang."
+
+                    filtered_df['Instruksi_Aksi'] = filtered_df.apply(smart_ai_recommendation, axis=1)
+                    
+                    if 'Feedback_Staff' not in filtered_df.columns:
+                        filtered_df['Feedback_Staff'] = "Belum ada catatan"
+
+                    st.session_state['filtered_data'] = filtered_df
+                    st.success("Mapping dan Analisis AI Berhasil Diterapkan! Silakan klik tombol Next di atas.")
+            else:
+                st.error("Kolom 'Cat' (Category) tidak ditemukan pada struktur file.")
+    else:
+        st.info("👆 Silakan masukkan Kode Toko di atas untuk memunculkan data dan opsi mapping.")
 
 # ==========================================
-# TAHAP 3: REVIEW, SMART SEARCH & STAFF FEEDBACK LOOP
+# TAHAP 3: REVIEW, SMART SEARCH & FEEDBACK
 # ==========================================
 elif st.session_state['step'] == 3:
-    st.markdown(f"### **Langkah 3 dari 4: Review Data, Koreksi & AI Learning ({st.session_state['store_name_dynamic']})**")
+    st.markdown(f"### **Langkah 3 dari 4: Review Data & AI Smart Search Engine ({st.session_state['store_name_dynamic']})**")
     
     st.markdown("#### **🔍 AI Smart Search & Filter Engine**")
-    st.info("Ketik kata kunci (seperti nama staff, brand, atau jenis instruksi) untuk menyaring data secara instan.")
+    st.info("Ketik kata kunci untuk menyaring data secara instan.")
     
     ai_query = st.text_input(
         "Ketik kata kunci pencarian:",
@@ -223,40 +224,34 @@ elif st.session_state['step'] == 3:
             st.session_state['step'] = 4
             st.rerun()
 
-    current_data = st.session_state['filtered_data']
+    if 'filtered_data' in st.session_state:
+        current_data = st.session_state['filtered_data']
 
-    if ai_query:
-        mask = current_data.apply(lambda row: row.astype(str).str.contains(ai_query, case=False).any(), axis=1)
-        display_df = current_data[mask]
+        if ai_query:
+            mask = current_data.apply(lambda row: row.astype(str).str.contains(ai_query, case=False).any(), axis=1)
+            display_df = current_data[mask]
+        else:
+            display_df = current_data
+
+        possible_cols = []
+        for col in display_df.columns:
+            c_low = str(col).lower()
+            if any(k in c_low for k in ['code', 'site', 'desc', 'am', 'article', 'brand', 'cat', 'staff', 'instruksi', 'aksi', 'feedback', 'remark']):
+                possible_cols.append(col)
+
+        table_view_df = display_df[possible_cols] if possible_cols else display_df
+
+        st.markdown("#### **📝 Tabel Review & Catatan Koreksi Staf**")
+        edited_table = st.data_editor(
+            table_view_df,
+            use_container_width=True,
+            height=400,
+            hide_index=True,
+            key="editor_review_feedback"
+        )
+        st.session_state['final_edited_data'] = current_data
     else:
-        display_df = current_data
-
-    # Filter kolom penting (termasuk instruksi AI dan kolom feedback staff untuk koreksi)
-    possible_cols = []
-    for col in display_df.columns:
-        c_low = str(col).lower()
-        if any(k in c_low for k in ['code', 'site', 'desc', 'am', 'article', 'brand', 'cat', 'staff', 'instruksi', 'aksi', 'feedback', 'remark']):
-            possible_cols.append(col)
-
-    if possible_cols:
-        table_view_df = display_df[possible_cols]
-    else:
-        table_view_df = display_df
-
-    st.markdown("#### **📝 Tabel Review & Catatan Koreksi Staf**")
-    st.write("Anda dapat mengedit langsung kolom **Feedback_Staff** atau **Instruksi_Aksi** di tabel bawah untuk mencatat koreksi lapangan:")
-    
-    # Tabel interaktif agar staff dapat merevisi instruksi atau memberikan feedback
-    edited_table = st.data_editor(
-        table_view_df,
-        use_container_width=True,
-        height=400,
-        hide_index=True,
-        key="editor_review_feedback"
-    )
-
-    # Sinkronisasi hasil edit staff kembali ke session state utama
-    st.session_state['final_edited_data'] = current_data
+        st.warning("Belum ada data toko yang diproses. Silakan kembali ke Langkah 2.")
 
 # ==========================================
 # TAHAP 4: DOWNLOAD LAPORAN & FILE MARKDOWN
@@ -269,33 +264,36 @@ elif st.session_state['step'] == 4:
         st.rerun()
 
     st.markdown("---")
-    final_df = st.session_state['final_edited_data']
+    if 'final_edited_data' in st.session_state:
+        final_df = st.session_state['final_edited_data']
 
-    col_dl1, col_dl2 = st.columns(2)
+        col_dl1, col_dl2 = st.columns(2)
 
-    def convert_df_to_excel(df_in):
-        output = BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df_in.to_excel(writer, index=False, sheet_name='Laporan_Final')
-        return output.getvalue()
+        def convert_df_to_excel(df_in):
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df_in.to_excel(writer, index=False, sheet_name='Laporan_Final')
+            return output.getvalue()
 
-    with col_dl1:
-        st.markdown("#### **📥 Rekap Laporan Toko Keseluruhan**")
-        excel_all = convert_df_to_excel(final_df)
-        st.download_button(
-            label="Download Rekap Lengkap (Excel)",
-            data=excel_all,
-            file_name=f"Laporan_Final_{st.session_state['store_name_dynamic'].replace(' ', '_')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+        with col_dl1:
+            st.markdown("#### **📥 Rekap Laporan Toko Keseluruhan**")
+            excel_all = convert_df_to_excel(final_df)
+            st.download_button(
+                label="Download Rekap Lengkap (Excel)",
+                data=excel_all,
+                file_name=f"Laporan_Final_{st.session_state['store_name_dynamic'].replace(' ', '_')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
 
-    with col_dl2:
-        st.markdown("#### **📦 Khusus File Barang Markdown**")
-        markdown_df = final_df[final_df.astype(str).apply(lambda x: x.str.contains("Markdown", case=False)).any(axis=1)]
-        excel_markdown = convert_df_to_excel(markdown_df)
-        st.download_button(
-            label="Download File Markdown Saja (Excel)",
-            data=excel_markdown,
-            file_name=f"File_Markdown_{st.session_state['store_name_dynamic'].replace(' ', '_')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+        with col_dl2:
+            st.markdown("#### **📦 Khusus File Barang Markdown**")
+            markdown_df = final_df[final_df.astype(str).apply(lambda x: x.str.contains("Markdown", case=False)).any(axis=1)]
+            excel_markdown = convert_df_to_excel(markdown_df)
+            st.download_button(
+                label="Download File Markdown Saja (Excel)",
+                data=excel_markdown,
+                file_name=f"File_Markdown_{st.session_state['store_name_dynamic'].replace(' ', '_')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+    else:
+        st.warning("Tidak ada data untuk diunduh.")
