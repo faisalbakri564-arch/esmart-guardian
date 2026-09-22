@@ -128,7 +128,6 @@ elif st.session_state['step'] == 2:
             st.session_state['step'] = 3
             st.rerun()
 
-    # Kotak input kode toko dibuat kosong (value="") agar diisi mandiri
     store_code = st.text_input("Masukkan Kode Toko Anda (Contoh: 6849):", value="")
     
     if store_code:
@@ -177,7 +176,6 @@ elif st.session_state['step'] == 2:
                         
                         brand_name = str(row[brand_col]) if brand_col and brand_col in row else "Produk"
                         
-                        # Aturan AI khusus berdasarkan remark
                         if 'expired' in remark_text or 'lewat' in remark_text:
                             return f"⚠️ [EXPIRED LEWAT]: Segera ajukan ajuan WO tambahan."
                         elif 'blue dot' in remark_text or 'not approved' in remark_text:
@@ -200,10 +198,10 @@ elif st.session_state['step'] == 2:
         st.info("👆 Silakan masukkan Kode Toko di atas untuk memunculkan data dan opsi mapping.")
 
 # ==========================================
-# TAHAP 3: REVIEW, SMART SEARCH & FEEDBACK
+# TAHAP 3: REVIEW, SMART SEARCH & HANYA FEEDBACK STAFF YANG BISA DIEDIT
 # ==========================================
 elif st.session_state['step'] == 3:
-    st.markdown(f"### **Langkah 3 dari 4: Review Data & AI Smart Search Engine ({st.session_state['store_name_dynamic']})**")
+    st.markdown(f"### **Langkah 3 dari 4: Review Data & Koreksi Staf ({st.session_state['store_name_dynamic']})**")
     
     st.markdown("#### **🔍 AI Smart Search & Filter Engine**")
     st.info("Ketik kata kunci untuk menyaring data secara instan.")
@@ -242,19 +240,34 @@ elif st.session_state['step'] == 3:
         table_view_df = display_df[possible_cols] if possible_cols else display_df
 
         st.markdown("#### **📝 Tabel Review & Catatan Koreksi Staf**")
+        st.info("💡 Anda hanya dapat mengedit kolom **Feedback_Staff** di tabel bawah. Kolom lainnya terkunci agar aman.")
+
+        # Konfigurasi agar HANYA kolom Feedback_Staff yang bisa diedit (disabled untuk kolom lain)
+        column_config = {}
+        for col in table_view_df.columns:
+            if col != 'Feedback_Staff':
+                column_config[col] = st.column_config.Column(disabled=True)
+
         edited_table = st.data_editor(
             table_view_df,
             use_container_width=True,
             height=400,
             hide_index=True,
+            column_config=column_config,
             key="editor_review_feedback"
         )
+
+        # Simpan hasil editan staf pada kolom Feedback_Staff ke data utama secara permanen
+        for idx in edited_table.index:
+            if idx in current_data.index:
+                current_data.at[idx, 'Feedback_Staff'] = edited_table.at[idx, 'Feedback_Staff']
+
         st.session_state['final_edited_data'] = current_data
     else:
         st.warning("Belum ada data toko yang diproses. Silakan kembali ke Langkah 2.")
 
 # ==========================================
-# TAHAP 4: DOWNLOAD LAPORAN & FILE MARKDOWN
+# TAHAP 4: DOWNLOAD LAPORAN TERESEDIKASI
 # ==========================================
 elif st.session_state['step'] == 4:
     st.markdown(f"### **Langkah 4 dari 4: Unduh Laporan Resmi Toko ({st.session_state['store_name_dynamic']})**")
