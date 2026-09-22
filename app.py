@@ -92,7 +92,6 @@ if st.session_state['step'] == 1:
                             if file_name_lower.endswith('.csv'):
                                 df_temp = pd.read_csv(file, sep=';', header=1, on_bad_lines='skip', dtype=str)
                             elif file_name_lower.endswith('.xlsb'):
-                                # Pembacaan khusus format .xlsb menggunakan engine pyxlsb
                                 df_temp = pd.read_excel(file, header=1, engine='pyxlsb', dtype=str)
                             else:
                                 df_temp = pd.read_excel(file, header=1, dtype=str)
@@ -102,7 +101,8 @@ if st.session_state['step'] == 1:
                     
                     if all_data:
                         combined_df = pd.concat(all_data, ignore_index=True)
-                        combined_df.columns = combined_df.columns.str.strip()
+                        # Pastikan semua nama kolom diubah menjadi string bersih
+                        combined_df.columns = [str(c).strip() for c in combined_df.columns]
                         
                         combined_df = combined_df.loc[:, ~combined_df.columns.str.contains('^Unnamed|^None', case=False, na=False)]
                         combined_df = combined_df.dropna(how='all', axis=1)
@@ -132,13 +132,14 @@ elif st.session_state['step'] == 2:
     store_code = st.text_input("Masukkan Kode Toko Anda (Contoh: 6849):", value="6849")
     raw_df = st.session_state['raw_data']
     
-    code_col = next((col for col in raw_df.columns if 'code' in col.lower() or 'site' in col.lower()), None)
-    site_desc_col = next((col for col in raw_df.columns if 'site desc' in col.lower() or 'store' in col.lower() or 'desc' in col.lower()), None)
+    # Pengaman pencarian kolom agar aman dari error tipe data
+    code_col = next((col for col in raw_df.columns if 'code' in str(col).lower() or 'site' in str(col).lower()), None)
+    site_desc_col = next((col for col in raw_df.columns if 'site desc' in str(col).lower() or 'store' in str(col).lower() or 'desc' in str(col).lower()), None)
 
     if code_col:
         filtered_df = raw_df[raw_df[code_col].astype(str).str.contains(store_code, na=False)].copy()
         if site_desc_col and not filtered_df.empty:
-            st.session_state['store_name_dynamic'] = filtered_df[site_desc_col].iloc[0]
+            st.session_state['store_name_dynamic'] = str(filtered_df[site_desc_col].iloc[0])
         else:
             st.session_state['store_name_dynamic'] = f"Toko Kode {store_code}"
     else:
@@ -153,7 +154,7 @@ elif st.session_state['step'] == 2:
     if not st.session_state['staff_list']:
         st.warning("⚠️ Belum ada nama staff yang dimasukkan. Harap kembali ke Langkah 1 dan tambahkan minimal 1 nama staff.")
     else:
-        cat_col = next((col for col in raw_df.columns if col.upper() == 'CAT' or 'cat' in col.lower()), None)
+        cat_col = next((col for col in raw_df.columns if str(col).upper() == 'CAT' or 'cat' in str(col).lower()), None)
         
         if cat_col:
             unique_cats = filtered_df[cat_col].dropna().unique()
@@ -166,8 +167,8 @@ elif st.session_state['step'] == 2:
             if st.button("🚀 Terapkan Mapping Category & Jalankan AI"):
                 filtered_df['Staff_Penanggung_Jawab'] = filtered_df[cat_col].map(mapping_input).fillna("Belum Ditugaskan")
                 
-                remark_col = next((col for col in filtered_df.columns if 'remark' in col.lower() or 'feedback' in col.lower() or 'instruction' in col.lower()), None)
-                brand_col = next((col for col in raw_df.columns if 'brand' in col.lower()), None)
+                remark_col = next((col for col in filtered_df.columns if 'remark' in str(col).lower() or 'feedback' in str(col).lower() or 'instruction' in str(col).lower()), None)
+                brand_col = next((col for col in raw_df.columns if 'brand' in str(col).lower()), None)
 
                 def smart_ai_recommendation(row):
                     existing_info = ""
@@ -222,7 +223,7 @@ elif st.session_state['step'] == 3:
 
     possible_cols = []
     for col in display_df.columns:
-        c_low = col.lower()
+        c_low = str(col).lower()
         if any(k in c_low for k in ['code', 'site', 'desc', 'am', 'article', 'brand', 'cat', 'staff', 'instruksi']):
             possible_cols.append(col)
 
