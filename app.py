@@ -45,40 +45,17 @@ st.title("🛡️ E-Smart Guardian: Manajemen ED & Mitigasi Shrinkage")
 st.markdown("---")
 
 # ==========================================
-# TAHAP 1: INPUT/HAPUS STAFF, TEMPLATE & UPLOAD DATA
+# TAHAP 1: TEMPLATE & UPLOAD DATA
 # ==========================================
 if st.session_state['step'] == 1:
     st.markdown("### **Langkah 1 dari 4: Pengaturan Staff & Unggah Data Laporan**")
     
-    with st.expander("👥 Kelola / Tambah & Hapus Nama Staff Toko (Manual)"):
-        st.info("Tambahkan atau hapus nama staff sesuai kebutuhan toko.")
-        def add_staff_callback():
-            val = st.session_state.get("input_staff_baru", "").strip()
-            if val and val not in st.session_state['staff_list']:
-                st.session_state['staff_list'].append(val)
-            st.session_state["input_staff_baru"] = ""
-        st.text_input("Nama Staff Baru:", key="input_staff_baru")
-        st.button("➕ Tambahkan Staff", on_click=add_staff_callback)
-        st.markdown("---")
-        st.write("**Daftar Staff Saat Ini:**")
-        if st.session_state['staff_list']:
-            for idx, staff in enumerate(st.session_state['staff_list']):
-                col_s1, col_s2 = st.columns([4, 1])
-                col_s1.write(f"- {staff}")
-                if col_s2.button("🗑️ Hapus", key=f"del_staff_{idx}"):
-                    st.session_state['staff_list'].pop(idx)
-                    st.rerun()
-        else:
-            st.warning("Belum ada staff yang ditambahkan.")
-
-    st.markdown("---")
     st.markdown("#### **📋 Template Pembagian Tugas Cek ED (Otomatis)**")
     st.info("Download template ini. Seluruh Kategori sudah terisi otomatis! Anda hanya perlu mengisi NRP dan Nama Staff di baris yang ditugaskan, lalu upload kembali.")
     
     # Fungsi Generate Template Excel dengan Seluruh Kategori dari Data Asli
     def generate_template():
         output = BytesIO()
-        # Daftar lengkap 135 Kategori diekstrak dari file data asli
         all_categories = [
             'ANALGESICS & FEVER', 'BABY BATH', 'BABY COLOGNE', 'BABY HAIR', 'BABY OIL', 'BABY OTHERS', 
             'BABY SKINCARE', 'BABY SUNSCREEN', 'BEAUTY ACC', 'BEAUTY ENHANCER', 'BLUSHER', 'BODY LOTION', 
@@ -105,7 +82,6 @@ if st.session_state['step'] == 1:
             'WAXING', 'WEIGHT MANAGEMENT', 'WET TISSUE', 'WOMAN SHAVING', 'WOMEN HEALTH'
         ]
         
-        # Kolom sesuai urutan: Kategori | NRP | Nama Staff
         df_tpl = pd.DataFrame({
             "Kategori": all_categories,
             "NRP": ["" for _ in range(len(all_categories))],
@@ -130,22 +106,18 @@ if st.session_state['step'] == 1:
     if uploaded_template:
         try:
             df_mapping = pd.read_excel(uploaded_template)
-            # Pastikan format template sesuai
             if 'Kategori' in df_mapping.columns and 'Nama Staff' in df_mapping.columns:
                 df_mapping_clean = df_mapping.dropna(subset=['Kategori', 'Nama Staff'])
                 
-                # Buang baris yang nama staff-nya masih kosong
                 df_mapping_clean = df_mapping_clean[df_mapping_clean['Nama Staff'].astype(str).str.strip() != '']
                 df_mapping_clean = df_mapping_clean[df_mapping_clean['Nama Staff'].astype(str).str.strip().str.lower() != 'nan']
                 
                 staff_from_tpl = df_mapping_clean['Nama Staff'].astype(str).str.strip().unique().tolist()
                 
-                # Masukkan staff dari template otomatis ke dalam list sistem
                 for s in staff_from_tpl:
                     if s and s not in st.session_state['staff_list']:
                         st.session_state['staff_list'].append(s)
                         
-                # Simpan mapping Kategori ke Nama Staff
                 mapping_dict = dict(zip(df_mapping_clean['Kategori'].astype(str).str.strip(), df_mapping_clean['Nama Staff'].astype(str).str.strip()))
                 st.session_state['template_mapping_dict'] = mapping_dict
                 st.success("✅ Template berhasil dimuat! Nama staf otomatis ditambahkan dan akan di-mapping di Langkah 2.")
@@ -164,7 +136,7 @@ if st.session_state['step'] == 1:
 
     col_b1, col_b2 = st.columns([4, 1])
     with col_b2:
-        if st.button("Next ➡️️"):
+        if st.button("Next ➡"):
             if uploaded_files:
                 if len(uploaded_files) > 5:
                     st.error("Maksimal hanya 5 file yang dapat diunggah sekaligus!")
@@ -230,7 +202,7 @@ elif st.session_state['step'] == 2:
         st.markdown("#### **Mapping Penanggung Jawab Berdasarkan Kategori (Category)**")
         
         if not st.session_state['staff_list']:
-            st.warning("⚠️ Belum ada nama staff yang dimasukkan. Harap kembali ke Langkah 1 dan tambahkan minimal 1 nama staff, atau upload template.")
+            st.warning("⚠️ Belum ada nama staff yang dimasukkan. Harap kembali ke Langkah 1 dan upload template.")
         else:
             cat_col = next((col for col in raw_df.columns if str(col).upper() == 'CAT' or 'cat' in str(col).lower()), None)
             
@@ -244,7 +216,6 @@ elif st.session_state['step'] == 2:
                     cat_clean = str(cat).strip()
                     default_idx = 0
                     
-                    # Logika Auto-Fill dari Template yang diupload
                     if cat_clean in mapping_dict_tpl:
                         staff_name = mapping_dict_tpl[cat_clean]
                         if staff_name in st.session_state['staff_list']:
@@ -379,6 +350,21 @@ elif st.session_state['step'] == 4:
     if 'final_edited_data' in st.session_state:
         final_df = st.session_state['final_edited_data']
 
+        # LOGIKA FILTERING KOLOM: Hapus kolom yang tidak relevan untuk laporan akhir
+        cols_to_remove = ['city', 'region', 'dept', 'brand', 'dot', 'code.1', 'exp', 'cost', 'total value', 'sos']
+        columns_to_keep = []
+        
+        for col in final_df.columns:
+            col_lower = str(col).lower().strip()
+            # Memfilter kolom yang persis sama atau yang mengandung kata kunci spesifik
+            if col_lower in cols_to_remove or 'list markdown' in col_lower or '3773603066' in col_lower:
+                continue
+            else:
+                columns_to_keep.append(col)
+                
+        # Dataframe baru khusus untuk didownload (dengan kolom bersih)
+        download_df = final_df[columns_to_keep]
+
         col_dl1, col_dl2 = st.columns(2)
 
         def convert_df_to_excel(df_in):
@@ -389,7 +375,7 @@ elif st.session_state['step'] == 4:
 
         with col_dl1:
             st.markdown("#### **📥 Rekap Laporan Toko Keseluruhan**")
-            excel_all = convert_df_to_excel(final_df)
+            excel_all = convert_df_to_excel(download_df)
             st.download_button(
                 label="Download Rekap Lengkap (Excel)",
                 data=excel_all,
@@ -399,7 +385,7 @@ elif st.session_state['step'] == 4:
 
         with col_dl2:
             st.markdown("#### **📦 Khusus File Barang Markdown**")
-            markdown_df = final_df[final_df.astype(str).apply(lambda x: x.str.contains("Markdown", case=False)).any(axis=1)]
+            markdown_df = download_df[download_df.astype(str).apply(lambda x: x.str.contains("Markdown", case=False)).any(axis=1)]
             excel_markdown = convert_df_to_excel(markdown_df)
             st.download_button(
                 label="Download File Markdown Saja (Excel)",
