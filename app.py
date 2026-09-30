@@ -31,6 +31,9 @@ if 'store_name_dynamic' not in st.session_state:
 if 'ai_search_query' not in st.session_state:
     st.session_state['ai_search_query'] = ""
 
+if 'template_mapping_dict' not in st.session_state:
+    st.session_state['template_mapping_dict'] = {}
+
 # Tombol Kembali ke Home di Sidebar
 if st.session_state['step'] > 1:
     if st.sidebar.button("🏠 Kembali ke Menu Utama (Home)"):
@@ -42,23 +45,20 @@ st.title("🛡️ E-Smart Guardian: Manajemen ED & Mitigasi Shrinkage")
 st.markdown("---")
 
 # ==========================================
-# TAHAP 1: INPUT/HAPUS STAFF & UPLOAD FILE
+# TAHAP 1: INPUT/HAPUS STAFF, TEMPLATE & UPLOAD DATA
 # ==========================================
 if st.session_state['step'] == 1:
     st.markdown("### **Langkah 1 dari 4: Pengaturan Staff & Unggah Data Laporan**")
     
-    with st.expander("👥 Kelola / Tambah & Hapus Nama Staff Toko"):
+    with st.expander("👥 Kelola / Tambah & Hapus Nama Staff Toko (Manual)"):
         st.info("Tambahkan atau hapus nama staff sesuai kebutuhan toko.")
-        
         def add_staff_callback():
             val = st.session_state.get("input_staff_baru", "").strip()
             if val and val not in st.session_state['staff_list']:
                 st.session_state['staff_list'].append(val)
             st.session_state["input_staff_baru"] = ""
-
         st.text_input("Nama Staff Baru:", key="input_staff_baru")
         st.button("➕ Tambahkan Staff", on_click=add_staff_callback)
-        
         st.markdown("---")
         st.write("**Daftar Staff Saat Ini:**")
         if st.session_state['staff_list']:
@@ -72,8 +72,57 @@ if st.session_state['step'] == 1:
             st.warning("Belum ada staff yang ditambahkan.")
 
     st.markdown("---")
+    st.markdown("#### **📋 Template Pembagian Tugas Cek ED (Opsional)**")
+    st.info("Biar tidak capek memilih nama staf satu-satu di Langkah 2, download template ini, isi nama staf per kategori, lalu upload kembali!")
+    
+    # Fungsi Generate Template Excel
+    def generate_template():
+        output = BytesIO()
+        df_tpl = pd.DataFrame({
+            "Kategori": ["COUGH & COLD", "EYE CARE", "LIP TINT", "SKIN CARE", "HAIR TREATMENT"],
+            "Staff_Penanggung_Jawab": ["", "", "", "", ""]
+        })
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df_tpl.to_excel(writer, index=False, sheet_name='Template_Mapping')
+        return output.getvalue()
+        
+    st.download_button(
+        label="📥 Download Template Pembagian Cek ED",
+        data=generate_template(),
+        file_name="Template_Pembagian_Cek_ED.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    
+    uploaded_template = st.file_uploader(
+        "Upload Template Pembagian Cek ED yang sudah diisi:", 
+        type=["xlsx", "xls"]
+    )
+    
+    if uploaded_template:
+        try:
+            df_mapping = pd.read_excel(uploaded_template)
+            if 'Kategori' in df_mapping.columns and 'Staff_Penanggung_Jawab' in df_mapping.columns:
+                df_mapping_clean = df_mapping.dropna(subset=['Kategori', 'Staff_Penanggung_Jawab'])
+                staff_from_tpl = df_mapping_clean['Staff_Penanggung_Jawab'].astype(str).str.strip().unique().tolist()
+                
+                # Masukkan staff dari template otomatis ke dalam list
+                for s in staff_from_tpl:
+                    if s and s not in st.session_state['staff_list']:
+                        st.session_state['staff_list'].append(s)
+                        
+                # Simpan kamus/dictionary mapping
+                mapping_dict = dict(zip(df_mapping_clean['Kategori'].astype(str).str.strip(), df_mapping_clean['Staff_Penanggung_Jawab'].astype(str).str.strip()))
+                st.session_state['template_mapping_dict'] = mapping_dict
+                st.success("✅ Template berhasil dimuat! Nama staf otomatis ditambahkan dan akan di-mapping di Langkah 2.")
+            else:
+                st.error("Format template salah. Pastikan ada kolom 'Kategori' dan 'Staff_Penanggung_Jawab'.")
+        except Exception as e:
+            st.error(f"Gagal membaca template: {e}")
+
+    st.markdown("---")
+    st.markdown("#### **📁 Unggah Data Laporan (File Master)**")
     uploaded_files = st.file_uploader(
-        "Pilih file data laporan (Mendukung SEMUA format Excel .xlsx, .xlsb, .xls & CSV, maks 5 file):", 
+        "Pilih file data laporan dari pusat (Mendukung Excel .xlsx, .xlsb, .xls & CSV, maks 5 file):", 
         type=["csv", "xlsx", "xls", "xlsb", "xlsm"], 
         accept_multiple_files=True
     )
@@ -102,7 +151,6 @@ if st.session_state['step'] == 1:
                     if all_data:
                         combined_df = pd.concat(all_data, ignore_index=True)
                         combined_df.columns = [str(c).strip() for c in combined_df.columns]
-                        
                         combined_df = combined_df.loc[:, ~combined_df.columns.str.contains('^Unnamed|^None', case=False, na=False)]
                         combined_df = combined_df.dropna(how='all', axis=1)
 
@@ -110,7 +158,7 @@ if st.session_state['step'] == 1:
                         st.session_state['step'] = 2
                         st.rerun()
             else:
-                st.warning("Harap unggah file terlebih dahulu.")
+                st.warning("Harap unggah file laporan terlebih dahulu.")
 
 # ==========================================
 # TAHAP 2: KODE TOKO KOSONG & MAPPING STAFF
@@ -118,7 +166,6 @@ if st.session_state['step'] == 1:
 elif st.session_state['step'] == 2:
     st.markdown("### **Langkah 2 dari 4: Masukkan Kode Toko & Mapping Tanggung Jawab Staff (By Category)**")
     
-    # Tombol Back saja di atas
     col_nav1, _ = st.columns([1, 4])
     with col_nav1:
         if st.button("⬅️ Back"):
@@ -155,17 +202,27 @@ elif st.session_state['step'] == 2:
             if cat_col:
                 unique_cats = filtered_df[cat_col].dropna().unique()
                 mapping_input = {}
+                mapping_dict_tpl = st.session_state.get('template_mapping_dict', {})
                 
-                st.info(f"Ditemukan {len(unique_cats)} Kategori produk. Silakan tentukan penanggung jawabnya:")
+                st.info(f"Ditemukan {len(unique_cats)} Kategori produk. Jika Anda sudah upload template, kotak di bawah ini akan otomatis terisi:")
                 for cat in unique_cats: 
-                    mapping_input[cat] = st.selectbox(f"Staff untuk Kategori: **{cat}**", st.session_state['staff_list'], key=f"map_cat_{cat}")
+                    cat_clean = str(cat).strip()
+                    default_idx = 0
+                    
+                    # Logika Auto-Fill dari Template yang diupload
+                    if cat_clean in mapping_dict_tpl:
+                        staff_name = mapping_dict_tpl[cat_clean]
+                        if staff_name in st.session_state['staff_list']:
+                            default_idx = st.session_state['staff_list'].index(staff_name)
+                    
+                    mapping_input[cat] = st.selectbox(f"Staff untuk Kategori: **{cat}**", st.session_state['staff_list'], index=default_idx, key=f"map_cat_{cat}")
 
-                # Tombol Aksi di Bawah (Terapkan Mapping & Next Berdampingan)
+                st.markdown("<br>", unsafe_allow_html=True)
                 col_act1, col_act2 = st.columns(2)
                 with col_act1:
                     btn_apply = st.button("🚀 Terapkan Mapping Category & Jalankan AI")
                 with col_act2:
-                    btn_next_step = st.button("Next ➡️ (Lanjut ke Review)")
+                    btn_next_step = st.button("Next ➡️️ (Lanjut ke Review)")
 
                 if btn_apply:
                     filtered_df['Staff_Penanggung_Jawab'] = filtered_df[cat_col].map(mapping_input).fillna("Belum Ditugaskan")
