@@ -45,7 +45,7 @@ st.title("🛡️ E-Smart Guardian: Manajemen ED & Mitigasi Shrinkage")
 st.markdown("---")
 
 # ==========================================
-# TAHAP 1: TEMPLATE & UPLOAD DATA
+# TAHAP 1: TEMPLATE & UPLOAD DATA (BERSIH DARI MANUAL INPUT)
 # ==========================================
 if st.session_state['step'] == 1:
     st.markdown("### **Langkah 1 dari 4: Pengaturan Staff & Unggah Data Laporan**")
@@ -114,13 +114,14 @@ if st.session_state['step'] == 1:
                 
                 staff_from_tpl = df_mapping_clean['Nama Staff'].astype(str).str.strip().unique().tolist()
                 
+                st.session_state['staff_list'] = []  # Reset list staf dari upload baru
                 for s in staff_from_tpl:
                     if s and s not in st.session_state['staff_list']:
                         st.session_state['staff_list'].append(s)
                         
                 mapping_dict = dict(zip(df_mapping_clean['Kategori'].astype(str).str.strip(), df_mapping_clean['Nama Staff'].astype(str).str.strip()))
                 st.session_state['template_mapping_dict'] = mapping_dict
-                st.success("✅ Template berhasil dimuat! Nama staf otomatis ditambahkan dan akan di-mapping di Langkah 2.")
+                st.success("✅ Template berhasil dimuat! Nama staf otomatis terbaca dan siap di-mapping di Langkah 2.")
             else:
                 st.error("Format template salah. Pastikan nama kolom 'Kategori', 'NRP', dan 'Nama Staff' tidak diubah.")
         except Exception as e:
@@ -202,7 +203,7 @@ elif st.session_state['step'] == 2:
         st.markdown("#### **Mapping Penanggung Jawab Berdasarkan Kategori (Category)**")
         
         if not st.session_state['staff_list']:
-            st.warning("⚠️ Belum ada nama staff yang dimasukkan. Harap kembali ke Langkah 1 dan upload template.")
+            st.warning("⚠️ Belum ada nama staff yang terdeteksi. Harap kembali ke Langkah 1 dan upload Template Pembagian Cek ED terlebih dahulu.")
         else:
             cat_col = next((col for col in raw_df.columns if str(col).upper() == 'CAT' or 'cat' in str(col).lower()), None)
             
@@ -211,7 +212,7 @@ elif st.session_state['step'] == 2:
                 mapping_input = {}
                 mapping_dict_tpl = st.session_state.get('template_mapping_dict', {})
                 
-                st.info(f"Ditemukan {len(unique_cats)} Kategori produk. Jika Anda sudah upload template, kotak di bawah ini akan otomatis terisi:")
+                st.info(f"Ditemukan {len(unique_cats)} Kategori produk. Kotak di bawah ini terisi otomatis dari template:")
                 for cat in unique_cats: 
                     cat_clean = str(cat).strip()
                     default_idx = 0
@@ -242,7 +243,7 @@ elif st.session_state['step'] == 2:
                             remark_text = str(row[remark_col]).lower()
                         
                         if 'expired' in remark_text or 'lewat' in remark_text:
-                            return f"⚠️ [EXPIRED LEWAT]: Segera ajukan ajuan WO tambahan."
+                            return f"⚠️️ [EXPIRED LEWAT]: Segera ajukan ajuan WO tambahan."
                         elif 'blue dot' in remark_text or 'not approved' in remark_text:
                             return f"🚨 [BLUE DOT / HOLD]: Pisahkan fisik untuk Program GWP atau Retur ke DC."
                         elif any(kw in remark_text for kw in ['markdown', 'rtw', 'return', 'disetujui', 'approved']):
@@ -356,13 +357,11 @@ elif st.session_state['step'] == 4:
         
         for col in final_df.columns:
             col_lower = str(col).lower().strip()
-            # Memfilter kolom yang persis sama atau yang mengandung kata kunci spesifik
             if col_lower in cols_to_remove or 'list markdown' in col_lower or '3773603066' in col_lower:
                 continue
             else:
                 columns_to_keep.append(col)
                 
-        # Dataframe baru khusus untuk didownload (dengan kolom bersih)
         download_df = final_df[columns_to_keep]
 
         col_dl1, col_dl2 = st.columns(2)
