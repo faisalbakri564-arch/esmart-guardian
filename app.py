@@ -72,15 +72,44 @@ if st.session_state['step'] == 1:
             st.warning("Belum ada staff yang ditambahkan.")
 
     st.markdown("---")
-    st.markdown("#### **📋 Template Pembagian Tugas Cek ED (Opsional)**")
-    st.info("Biar tidak capek memilih nama staf satu-satu di Langkah 2, download template ini, isi nama staf per kategori, lalu upload kembali!")
+    st.markdown("#### **📋 Template Pembagian Tugas Cek ED (Otomatis)**")
+    st.info("Download template ini. Seluruh Kategori sudah terisi otomatis! Anda hanya perlu mengisi NRP dan Nama Staff di baris yang ditugaskan, lalu upload kembali.")
     
-    # Fungsi Generate Template Excel
+    # Fungsi Generate Template Excel dengan Seluruh Kategori dari Data Asli
     def generate_template():
         output = BytesIO()
+        # Daftar lengkap 135 Kategori diekstrak dari file data asli
+        all_categories = [
+            'ANALGESICS & FEVER', 'BABY BATH', 'BABY COLOGNE', 'BABY HAIR', 'BABY OIL', 'BABY OTHERS', 
+            'BABY SKINCARE', 'BABY SUNSCREEN', 'BEAUTY ACC', 'BEAUTY ENHANCER', 'BLUSHER', 'BODY LOTION', 
+            'BODY SERUM', 'CONCEALER', 'CONTOUR', 'COTTON PADS', 'COUGH & COLD', 'CUSHION', 'DENTAL ACCESSORIES', 
+            'DENTURE', 'DEO', 'DERMA CLEANSER', 'DERMA ESSENCE', 'DERMA FACE MASK', 'DERMA MICELLAR', 
+            'DERMA MOISTURIZER', 'DERMA SERUM', 'DERMA SPECIAL TREATMENT', 'DERMA SUNCARE', 'DERMA TONER', 
+            'DIGESTIVE', 'EYE CARE', 'EYE SHADOW', 'EYEBROW', 'EYELINER', 'FACIAL TISSUE', 'FAMILY PLANNING', 
+            'FEMINE WASH / HYGINE', 'FIRST AID', 'FOUNDATION', 'FRAGRANCE', 'FUNCTIONAL DRINK', 'FUNCTIONAL FOOD', 
+            'GMS OTHERS', 'HAIR COLORING', 'HAIR CONDITIONER', 'HAIR SHAMPOO', 'HAIR STYLING', 'HAIR TREATMENT', 
+            'HAND SANITIZER', 'HAND WASH', 'HEALTH MASK', 'HEALTH SUPPLEMENT', 'HERBAL & TRADITIONAL', 'HIGHLIGHER', 
+            'JAPAN & KOREA CLEANSER', 'JAPAN & KOREA ESSENCE', 'JAPAN & KOREA FACE MASK', 'JAPAN & KOREA LIP BALM', 
+            'JAPAN & KOREA MICELLAR', 'JAPAN & KOREA MOISTURIZER', 'JAPAN & KOREA SERUM', 'JAPAN & KOREA SPECIAL TREATMENT', 
+            'JAPAN & KOREA SUNCARE', 'JAPAN & KOREA TONER', 'KIDS BATH', 'KIDS COLOGNE', 'KIDS GROOMING', 'KIDS HAIR', 
+            'KIDS SKINCARE', 'KIDS SUNSCREEN', 'KIDS VITAMIN', 'LIP CREAM', 'LIP GLOSS', 'LIP TINT', 'LIPSTICK', 
+            'LIQUID ANTISEPTIC', 'LIQUID SOAP', 'LOOSE POWDER', 'MASCARA', 'MASS SKIN CARE CLEANSER', 'MASS SKIN CARE ESSENCE', 
+            'MASS SKIN CARE FACE MASK', 'MASS SKIN CARE LIP BALM', 'MASS SKIN CARE MICELLAR', 'MASS SKIN CARE MOISTURIZER', 
+            'MASS SKIN CARE SERUM', 'MASS SKIN CARE SPECIAL TREATMENT', 'MASS SKIN CARE SUNCARE', 'MASS SKIN CARE TONER', 
+            'MEDICAL DEVICE', 'MEDICATED SKIN', 'MEN BATH', 'MEN CLEANSER', 'MEN DEO & FRAGRANCE', 'MEN FACE MASK', 
+            'MEN HAIR', 'MEN MOISTURIZER', 'MEN SERUM', 'MEN SHAVING', 'MEN SKINCARE OTHERS', 'MEN SUNCARE', 'MENTAL WELLNESS', 
+            'MOUTH WASH', 'NAIL COLOUR', 'NAIL TREATMENT', 'NAPKINS', 'OTC EXTERNAL OTHERS', 'OTC INTERNAL OTHERS', 
+            'PAIN RELIEF MEDICATION', 'PANTYLINERS', 'PAPER & CLEANING OTHERS', 'PHARMACY', 'PRESCRIPTION', 'PRESSED POWDER', 
+            'PRIMER', 'PROBIOTIC', 'REGULAR DRINK', 'REGULAR FOOD', 'SCRUB', 'SENSITIVE BODY', 'SETTING SPRAY', 'SHAVING CARE', 
+            'SPECIAL BATH', 'SPECIAL TREATMENT', 'TAMPON', 'TOOTH BRUSH', 'TOOTH PASTE', 'TOPICAL OIL', 'TREATMENT', 
+            'WAXING', 'WEIGHT MANAGEMENT', 'WET TISSUE', 'WOMAN SHAVING', 'WOMEN HEALTH'
+        ]
+        
+        # Kolom sesuai urutan: Kategori | NRP | Nama Staff
         df_tpl = pd.DataFrame({
-            "Kategori": ["COUGH & COLD", "EYE CARE", "LIP TINT", "SKIN CARE", "HAIR TREATMENT"],
-            "Staff_Penanggung_Jawab": ["", "", "", "", ""]
+            "Kategori": all_categories,
+            "NRP": ["" for _ in range(len(all_categories))],
+            "Nama Staff": ["" for _ in range(len(all_categories))]
         })
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df_tpl.to_excel(writer, index=False, sheet_name='Template_Mapping')
@@ -101,21 +130,27 @@ if st.session_state['step'] == 1:
     if uploaded_template:
         try:
             df_mapping = pd.read_excel(uploaded_template)
-            if 'Kategori' in df_mapping.columns and 'Staff_Penanggung_Jawab' in df_mapping.columns:
-                df_mapping_clean = df_mapping.dropna(subset=['Kategori', 'Staff_Penanggung_Jawab'])
-                staff_from_tpl = df_mapping_clean['Staff_Penanggung_Jawab'].astype(str).str.strip().unique().tolist()
+            # Pastikan format template sesuai
+            if 'Kategori' in df_mapping.columns and 'Nama Staff' in df_mapping.columns:
+                df_mapping_clean = df_mapping.dropna(subset=['Kategori', 'Nama Staff'])
                 
-                # Masukkan staff dari template otomatis ke dalam list
+                # Buang baris yang nama staff-nya masih kosong
+                df_mapping_clean = df_mapping_clean[df_mapping_clean['Nama Staff'].astype(str).str.strip() != '']
+                df_mapping_clean = df_mapping_clean[df_mapping_clean['Nama Staff'].astype(str).str.strip().str.lower() != 'nan']
+                
+                staff_from_tpl = df_mapping_clean['Nama Staff'].astype(str).str.strip().unique().tolist()
+                
+                # Masukkan staff dari template otomatis ke dalam list sistem
                 for s in staff_from_tpl:
                     if s and s not in st.session_state['staff_list']:
                         st.session_state['staff_list'].append(s)
                         
-                # Simpan kamus/dictionary mapping
-                mapping_dict = dict(zip(df_mapping_clean['Kategori'].astype(str).str.strip(), df_mapping_clean['Staff_Penanggung_Jawab'].astype(str).str.strip()))
+                # Simpan mapping Kategori ke Nama Staff
+                mapping_dict = dict(zip(df_mapping_clean['Kategori'].astype(str).str.strip(), df_mapping_clean['Nama Staff'].astype(str).str.strip()))
                 st.session_state['template_mapping_dict'] = mapping_dict
                 st.success("✅ Template berhasil dimuat! Nama staf otomatis ditambahkan dan akan di-mapping di Langkah 2.")
             else:
-                st.error("Format template salah. Pastikan ada kolom 'Kategori' dan 'Staff_Penanggung_Jawab'.")
+                st.error("Format template salah. Pastikan nama kolom 'Kategori', 'NRP', dan 'Nama Staff' tidak diubah.")
         except Exception as e:
             st.error(f"Gagal membaca template: {e}")
 
@@ -129,7 +164,7 @@ if st.session_state['step'] == 1:
 
     col_b1, col_b2 = st.columns([4, 1])
     with col_b2:
-        if st.button("Next ➡️"):
+        if st.button("Next ➡️️"):
             if uploaded_files:
                 if len(uploaded_files) > 5:
                     st.error("Maksimal hanya 5 file yang dapat diunggah sekaligus!")
@@ -195,7 +230,7 @@ elif st.session_state['step'] == 2:
         st.markdown("#### **Mapping Penanggung Jawab Berdasarkan Kategori (Category)**")
         
         if not st.session_state['staff_list']:
-            st.warning("⚠️ Belum ada nama staff yang dimasukkan. Harap kembali ke Langkah 1 dan tambahkan minimal 1 nama staff.")
+            st.warning("⚠️ Belum ada nama staff yang dimasukkan. Harap kembali ke Langkah 1 dan tambahkan minimal 1 nama staff, atau upload template.")
         else:
             cat_col = next((col for col in raw_df.columns if str(col).upper() == 'CAT' or 'cat' in str(col).lower()), None)
             
@@ -222,7 +257,7 @@ elif st.session_state['step'] == 2:
                 with col_act1:
                     btn_apply = st.button("🚀 Terapkan Mapping Category & Jalankan AI")
                 with col_act2:
-                    btn_next_step = st.button("Next ➡️️ (Lanjut ke Review)")
+                    btn_next_step = st.button("Next ➡ (Lanjut ke Review)")
 
                 if btn_apply:
                     filtered_df['Staff_Penanggung_Jawab'] = filtered_df[cat_col].map(mapping_input).fillna("Belum Ditugaskan")
