@@ -45,47 +45,27 @@ st.title("🛡️ E-Smart Guardian: Manajemen ED & Mitigasi Shrinkage")
 st.markdown("---")
 
 # ==========================================
-# TAHAP 1: TEMPLATE & UPLOAD DATA 
+# TAHAP 1: TEMPLATE & UPLOAD DATA
 # ==========================================
 if st.session_state['step'] == 1:
     st.markdown("### **Langkah 1 dari 4: Pengaturan Staff & Unggah Data Laporan**")
     
-    st.markdown("#### **📋 Template Pembagian Tugas Cek ED (Otomatis)**")
-    st.info("Download template ini. Seluruh Kategori sudah terisi otomatis! Anda hanya perlu mengisi Nama Staff di baris yang ditugaskan, lalu upload kembali.")
+    st.markdown("#### **📋 Template Pembagian Tugas Cek ED (Berdasarkan Dept)**")
+    st.info("Download template ini. Seluruh Departemen (Dept) sudah terisi otomatis! Anda hanya perlu mengisi Nama Staff di baris yang ditugaskan, lalu upload kembali.")
     
-    # Fungsi Generate Template Excel (Tanpa NRP)
+    # Fungsi Generate Template Excel dengan Dept dari Data Asli
     def generate_template():
         output = BytesIO()
-        all_categories = [
-            'ANALGESICS & FEVER', 'BABY BATH', 'BABY COLOGNE', 'BABY HAIR', 'BABY OIL', 'BABY OTHERS', 
-            'BABY SKINCARE', 'BABY SUNSCREEN', 'BEAUTY ACC', 'BEAUTY ENHANCER', 'BLUSHER', 'BODY LOTION', 
-            'BODY SERUM', 'CONCEALER', 'CONTOUR', 'COTTON PADS', 'COUGH & COLD', 'CUSHION', 'DENTAL ACCESSORIES', 
-            'DENTURE', 'DEO', 'DERMA CLEANSER', 'DERMA ESSENCE', 'DERMA FACE MASK', 'DERMA MICELLAR', 
-            'DERMA MOISTURIZER', 'DERMA SERUM', 'DERMA SPECIAL TREATMENT', 'DERMA SUNCARE', 'DERMA TONER', 
-            'DIGESTIVE', 'EYE CARE', 'EYE SHADOW', 'EYEBROW', 'EYELINER', 'FACIAL TISSUE', 'FAMILY PLANNING', 
-            'FEMINE WASH / HYGINE', 'FIRST AID', 'FOUNDATION', 'FRAGRANCE', 'FUNCTIONAL DRINK', 'FUNCTIONAL FOOD', 
-            'GMS OTHERS', 'HAIR COLORING', 'HAIR CONDITIONER', 'HAIR SHAMPOO', 'HAIR STYLING', 'HAIR TREATMENT', 
-            'HAND SANITIZER', 'HAND WASH', 'HEALTH MASK', 'HEALTH SUPPLEMENT', 'HERBAL & TRADITIONAL', 'HIGHLIGHER', 
-            'JAPAN & KOREA CLEANSER', 'JAPAN & KOREA ESSENCE', 'JAPAN & KOREA FACE MASK', 'JAPAN & KOREA LIP BALM', 
-            'JAPAN & KOREA MICELLAR', 'JAPAN & KOREA MOISTURIZER', 'JAPAN & KOREA SERUM', 'JAPAN & KOREA SPECIAL TREATMENT', 
-            'JAPAN & KOREA SUNCARE', 'JAPAN & KOREA TONER', 'KIDS BATH', 'KIDS COLOGNE', 'KIDS GROOMING', 'KIDS HAIR', 
-            'KIDS SKINCARE', 'KIDS SUNSCREEN', 'KIDS VITAMIN', 'LIP CREAM', 'LIP GLOSS', 'LIP TINT', 'LIPSTICK', 
-            'LIQUID ANTISEPTIC', 'LIQUID SOAP', 'LOOSE POWDER', 'MASCARA', 'MASS SKIN CARE CLEANSER', 'MASS SKIN CARE ESSENCE', 
-            'MASS SKIN CARE FACE MASK', 'MASS SKIN CARE LIP BALM', 'MASS SKIN CARE MICELLAR', 'MASS SKIN CARE MOISTURIZER', 
-            'MASS SKIN CARE SERUM', 'MASS SKIN CARE SPECIAL TREATMENT', 'MASS SKIN CARE SUNCARE', 'MASS SKIN CARE TONER', 
-            'MEDICAL DEVICE', 'MEDICATED SKIN', 'MEN BATH', 'MEN CLEANSER', 'MEN DEO & FRAGRANCE', 'MEN FACE MASK', 
-            'MEN HAIR', 'MEN MOISTURIZER', 'MEN SERUM', 'MEN SHAVING', 'MEN SKINCARE OTHERS', 'MEN SUNCARE', 'MENTAL WELLNESS', 
-            'MOUTH WASH', 'NAIL COLOUR', 'NAIL TREATMENT', 'NAPKINS', 'OTC EXTERNAL OTHERS', 'OTC INTERNAL OTHERS', 
-            'PAIN RELIEF MEDICATION', 'PANTYLINERS', 'PAPER & CLEANING OTHERS', 'PHARMACY', 'PRESCRIPTION', 'PRESSED POWDER', 
-            'PRIMER', 'PROBIOTIC', 'REGULAR DRINK', 'REGULAR FOOD', 'SCRUB', 'SENSITIVE BODY', 'SETTING SPRAY', 'SHAVING CARE', 
-            'SPECIAL BATH', 'SPECIAL TREATMENT', 'TAMPON', 'TOOTH BRUSH', 'TOOTH PASTE', 'TOPICAL OIL', 'TREATMENT', 
-            'WAXING', 'WEIGHT MANAGEMENT', 'WET TISSUE', 'WOMAN SHAVING', 'WOMEN HEALTH'
+        all_departments = [
+            'BABY', 'BATH', 'BEVERAGE', 'COTTON', 'DENTAL', 'DEO & FRAGRANCE', 'DERMA', 'EYE', 'FACE', 
+            'FOOD', 'HAIR', 'HAND & BODY', 'HOME HEALTHCARE', 'JAPAN & KOREA', 'KIDS', 'LIP', 
+            'MASS SKIN CARE', 'MEN PERSONAL CARE', 'MEN SKINCARE', 'NAIL', 'OTC EXTERNAL', 'OTC INTERNAL', 
+            'OTHERS', 'PAPER & CLEANING', 'PHARMACY', 'SANITARY PROTECTION', 'VITAMIN & SUPPLEMENT', 'WOMAN SHAVING'
         ]
         
-        # Template sekarang HANYA memiliki 2 kolom
         df_tpl = pd.DataFrame({
-            "Kategori": all_categories,
-            "Nama Staff": ["" for _ in range(len(all_categories))]
+            "Dept": all_departments,
+            "Nama Staff": ["" for _ in range(len(all_departments))]
         })
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df_tpl.to_excel(writer, index=False, sheet_name='Template_Mapping')
@@ -94,7 +74,7 @@ if st.session_state['step'] == 1:
     st.download_button(
         label="📥 Download Template Pembagian Cek ED",
         data=generate_template(),
-        file_name="Template_Pembagian_Cek_ED.xlsx",
+        file_name="Template_Pembagian_Cek_ED_By_Dept.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
     
@@ -106,8 +86,8 @@ if st.session_state['step'] == 1:
     if uploaded_template:
         try:
             df_mapping = pd.read_excel(uploaded_template)
-            if 'Kategori' in df_mapping.columns and 'Nama Staff' in df_mapping.columns:
-                df_mapping_clean = df_mapping.dropna(subset=['Kategori', 'Nama Staff'])
+            if 'Dept' in df_mapping.columns and 'Nama Staff' in df_mapping.columns:
+                df_mapping_clean = df_mapping.dropna(subset=['Dept', 'Nama Staff'])
                 
                 df_mapping_clean = df_mapping_clean[df_mapping_clean['Nama Staff'].astype(str).str.strip() != '']
                 df_mapping_clean = df_mapping_clean[df_mapping_clean['Nama Staff'].astype(str).str.strip().str.lower() != 'nan']
@@ -119,11 +99,11 @@ if st.session_state['step'] == 1:
                     if s and s not in st.session_state['staff_list']:
                         st.session_state['staff_list'].append(s)
                         
-                mapping_dict = dict(zip(df_mapping_clean['Kategori'].astype(str).str.strip(), df_mapping_clean['Nama Staff'].astype(str).str.strip()))
+                mapping_dict = dict(zip(df_mapping_clean['Dept'].astype(str).str.strip(), df_mapping_clean['Nama Staff'].astype(str).str.strip()))
                 st.session_state['template_mapping_dict'] = mapping_dict
                 st.success("✅ Template berhasil dimuat! Nama staf otomatis terbaca dan siap di-mapping di Langkah 2.")
             else:
-                st.error("Format template salah. Pastikan nama kolom 'Kategori' dan 'Nama Staff' tidak diubah.")
+                st.error("Format template salah. Pastikan nama kolom 'Dept' dan 'Nama Staff' tidak diubah.")
         except Exception as e:
             st.error(f"Gagal membaca template: {e}")
 
@@ -172,7 +152,7 @@ if st.session_state['step'] == 1:
 # TAHAP 2: KODE TOKO KOSONG & MAPPING STAFF
 # ==========================================
 elif st.session_state['step'] == 2:
-    st.markdown("### **Langkah 2 dari 4: Masukkan Kode Toko & Mapping Tanggung Jawab Staff (By Category)**")
+    st.markdown("### **Langkah 2 dari 4: Masukkan Kode Toko & Mapping Tanggung Jawab Staff (By Dept)**")
     
     col_nav1, _ = st.columns([1, 4])
     with col_nav1:
@@ -200,39 +180,40 @@ elif st.session_state['step'] == 2:
         st.success(f"🏢 Toko Terdeteksi: **{st.session_state['store_name_dynamic']}** (Total Data: {len(filtered_df)} baris)")
 
         st.markdown("---")
-        st.markdown("#### **Mapping Penanggung Jawab Berdasarkan Kategori (Category)**")
+        st.markdown("#### **Mapping Penanggung Jawab Berdasarkan Departemen (Dept)**")
         
         if not st.session_state['staff_list']:
             st.warning("⚠️ Belum ada nama staff yang terdeteksi. Harap kembali ke Langkah 1 dan upload Template Pembagian Cek ED terlebih dahulu.")
         else:
-            cat_col = next((col for col in raw_df.columns if str(col).upper() == 'CAT' or 'cat' in str(col).lower()), None)
+            # Berubah dari 'CAT' menjadi 'DEPT'
+            dept_col = next((col for col in raw_df.columns if str(col).upper() == 'DEPT' or 'dept' in str(col).lower()), None)
             
-            if cat_col:
-                unique_cats = filtered_df[cat_col].dropna().unique()
+            if dept_col:
+                unique_depts = filtered_df[dept_col].dropna().unique()
                 mapping_input = {}
                 mapping_dict_tpl = st.session_state.get('template_mapping_dict', {})
                 
-                st.info(f"Ditemukan {len(unique_cats)} Kategori produk. Kotak di bawah ini terisi otomatis dari template:")
-                for cat in unique_cats: 
-                    cat_clean = str(cat).strip()
+                st.info(f"Ditemukan {len(unique_depts)} Departemen (Dept). Kotak di bawah ini terisi otomatis dari template:")
+                for dept in unique_depts: 
+                    dept_clean = str(dept).strip()
                     default_idx = 0
                     
-                    if cat_clean in mapping_dict_tpl:
-                        staff_name = mapping_dict_tpl[cat_clean]
+                    if dept_clean in mapping_dict_tpl:
+                        staff_name = mapping_dict_tpl[dept_clean]
                         if staff_name in st.session_state['staff_list']:
                             default_idx = st.session_state['staff_list'].index(staff_name)
                     
-                    mapping_input[cat] = st.selectbox(f"Staff untuk Kategori: **{cat}**", st.session_state['staff_list'], index=default_idx, key=f"map_cat_{cat}")
+                    mapping_input[dept] = st.selectbox(f"Staff untuk Dept: **{dept}**", st.session_state['staff_list'], index=default_idx, key=f"map_dept_{dept}")
 
                 st.markdown("<br>", unsafe_allow_html=True)
                 col_act1, col_act2 = st.columns(2)
                 with col_act1:
-                    btn_apply = st.button("🚀 Terapkan Mapping Category & Jalankan AI")
+                    btn_apply = st.button("🚀 Terapkan Mapping Dept & Jalankan AI")
                 with col_act2:
                     btn_next_step = st.button("Next ➡ (Lanjut ke Review)")
 
                 if btn_apply:
-                    filtered_df['Staff_Penanggung_Jawab'] = filtered_df[cat_col].map(mapping_input).fillna("Belum Ditugaskan")
+                    filtered_df['Staff_Penanggung_Jawab'] = filtered_df[dept_col].map(mapping_input).fillna("Belum Ditugaskan")
                     
                     remark_col = next((col for col in filtered_df.columns if 'remark' in str(col).lower() or 'feedback' in str(col).lower() or 'instruction' in str(col).lower()), None)
                     brand_col = next((col for col in raw_df.columns if 'brand' in str(col).lower()), None)
@@ -257,16 +238,16 @@ elif st.session_state['step'] == 2:
                         filtered_df['Feedback_Staff'] = "Belum ada catatan"
 
                     st.session_state['filtered_data'] = filtered_df
-                    st.success("Mapping dan Analisis AI Berhasil Diterapkan!")
+                    st.success("Mapping Dept dan Analisis AI Berhasil Diterapkan!")
 
                 if btn_next_step:
                     if 'filtered_data' in st.session_state:
                         st.session_state['step'] = 3
                         st.rerun()
                     else:
-                        st.warning("Harap klik tombol 'Terapkan Mapping Category & Jalankan AI' terlebih dahulu.")
+                        st.warning("Harap klik tombol 'Terapkan Mapping Dept & Jalankan AI' terlebih dahulu.")
             else:
-                st.error("Kolom 'Cat' (Category) tidak ditemukan pada struktur file.")
+                st.error("Kolom 'Dept' tidak ditemukan pada struktur file.")
     else:
         st.info("👆 Silakan masukkan Kode Toko di atas untuk memunculkan data dan opsi mapping.")
 
@@ -307,7 +288,7 @@ elif st.session_state['step'] == 3:
         possible_cols = []
         for col in display_df.columns:
             c_low = str(col).lower()
-            if any(k in c_low for k in ['code', 'site', 'desc', 'am', 'article', 'brand', 'cat', 'staff', 'instruksi', 'aksi', 'feedback', 'remark']):
+            if any(k in c_low for k in ['code', 'site', 'desc', 'am', 'article', 'brand', 'dept', 'staff', 'instruksi', 'aksi', 'feedback', 'remark']):
                 possible_cols.append(col)
 
         table_view_df = display_df[possible_cols] if possible_cols else display_df
@@ -351,7 +332,7 @@ elif st.session_state['step'] == 4:
     if 'final_edited_data' in st.session_state:
         final_df = st.session_state['final_edited_data']
 
-        # LOGIKA FILTERING KOLOM: Hapus kolom yang tidak relevan untuk laporan akhir
+        # LOGIKA FILTERING KOLOM: Hapus kolom yang tidak relevan (termasuk Dept yang sudah selesai digunakan)
         cols_to_remove = ['city', 'region', 'dept', 'brand', 'dot', 'code.1', 'exp', 'cost', 'total value', 'sos']
         columns_to_keep = []
         
