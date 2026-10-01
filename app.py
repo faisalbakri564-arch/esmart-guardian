@@ -45,15 +45,15 @@ st.title("🛡️ E-Smart Guardian: Manajemen ED & Mitigasi Shrinkage")
 st.markdown("---")
 
 # ==========================================
-# TAHAP 1: TEMPLATE & UPLOAD DATA (BERSIH DARI MANUAL INPUT)
+# TAHAP 1: TEMPLATE & UPLOAD DATA 
 # ==========================================
 if st.session_state['step'] == 1:
     st.markdown("### **Langkah 1 dari 4: Pengaturan Staff & Unggah Data Laporan**")
     
     st.markdown("#### **📋 Template Pembagian Tugas Cek ED (Otomatis)**")
-    st.info("Download template ini. Seluruh Kategori sudah terisi otomatis! Anda hanya perlu mengisi NRP dan Nama Staff di baris yang ditugaskan, lalu upload kembali.")
+    st.info("Download template ini. Seluruh Kategori sudah terisi otomatis! Anda hanya perlu mengisi Nama Staff di baris yang ditugaskan, lalu upload kembali.")
     
-    # Fungsi Generate Template Excel dengan Seluruh Kategori dari Data Asli
+    # Fungsi Generate Template Excel (Tanpa NRP)
     def generate_template():
         output = BytesIO()
         all_categories = [
@@ -82,9 +82,9 @@ if st.session_state['step'] == 1:
             'WAXING', 'WEIGHT MANAGEMENT', 'WET TISSUE', 'WOMAN SHAVING', 'WOMEN HEALTH'
         ]
         
+        # Template sekarang HANYA memiliki 2 kolom
         df_tpl = pd.DataFrame({
             "Kategori": all_categories,
-            "NRP": ["" for _ in range(len(all_categories))],
             "Nama Staff": ["" for _ in range(len(all_categories))]
         })
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -123,7 +123,7 @@ if st.session_state['step'] == 1:
                 st.session_state['template_mapping_dict'] = mapping_dict
                 st.success("✅ Template berhasil dimuat! Nama staf otomatis terbaca dan siap di-mapping di Langkah 2.")
             else:
-                st.error("Format template salah. Pastikan nama kolom 'Kategori', 'NRP', dan 'Nama Staff' tidak diubah.")
+                st.error("Format template salah. Pastikan nama kolom 'Kategori' dan 'Nama Staff' tidak diubah.")
         except Exception as e:
             st.error(f"Gagal membaca template: {e}")
 
@@ -243,7 +243,7 @@ elif st.session_state['step'] == 2:
                             remark_text = str(row[remark_col]).lower()
                         
                         if 'expired' in remark_text or 'lewat' in remark_text:
-                            return f"⚠️️ [EXPIRED LEWAT]: Segera ajukan ajuan WO tambahan."
+                            return f"⚠️ [EXPIRED LEWAT]: Segera ajukan ajuan WO tambahan."
                         elif 'blue dot' in remark_text or 'not approved' in remark_text:
                             return f"🚨 [BLUE DOT / HOLD]: Pisahkan fisik untuk Program GWP atau Retur ke DC."
                         elif any(kw in remark_text for kw in ['markdown', 'rtw', 'return', 'disetujui', 'approved']):
