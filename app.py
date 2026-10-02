@@ -185,7 +185,6 @@ elif st.session_state['step'] == 2:
         if not st.session_state['staff_list']:
             st.warning("⚠️ Belum ada nama staff yang terdeteksi. Harap kembali ke Langkah 1 dan upload Template Pembagian Cek ED terlebih dahulu.")
         else:
-            # Berubah dari 'CAT' menjadi 'DEPT'
             dept_col = next((col for col in raw_df.columns if str(col).upper() == 'DEPT' or 'dept' in str(col).lower()), None)
             
             if dept_col:
@@ -332,7 +331,7 @@ elif st.session_state['step'] == 4:
     if 'final_edited_data' in st.session_state:
         final_df = st.session_state['final_edited_data']
 
-        # LOGIKA FILTERING KOLOM: Hapus kolom yang tidak relevan (termasuk Dept yang sudah selesai digunakan)
+        # LOGIKA FILTERING KOLOM: Hapus kolom yang tidak relevan
         cols_to_remove = ['city', 'region', 'dept', 'brand', 'dot', 'code.1', 'exp', 'cost', 'total value', 'sos']
         columns_to_keep = []
         
@@ -362,52 +361,46 @@ elif st.session_state['step'] == 4:
                 file_name=f"Laporan_Final_{st.session_state['store_name_dynamic'].replace(' ', '_')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
-	with col_dl2:
-            	st.markdown("#### **📦 Khusus File Barang Markdown**")
-            	# Tambahkan .copy() agar tidak muncul warning Pandas
-            	markdown_df = download_df[download_df.astype(str).apply(lambda x: x.str.contains("Markdown", 			case=False)).any(axis=1)].copy()
+
+        with col_dl2:
+            st.markdown("#### **📦 Khusus File Barang Markdown**")
             
-           	 # ========================================================
-           	 # MODIFIKASI: FORMAT TANGGAL & SUSUNAN KOLOM
-            	# ========================================================
+            # --- MODIFIKASI TERBARU (TANPA ERROR SPASI) ---
+            markdown_df = download_df[download_df.astype(str).apply(lambda x: x.str.contains("Markdown", case=False)).any(axis=1)].copy()
             
-            	# 1. Ubah Format Tanggal Menjadi Teks
-            	# Ganti dengan nama kolom tanggal di data Anda (misal: 'Exp Date', 'Tanggal')
-            	nama_kolom_tanggal = 'Nama_Kolom_Tanggal_Anda' 
+            # 1. Sesuaikan nama kolom tanggal di sini
+            nama_kolom_tanggal = 'Exp Date'  # Ganti jika nama kolom tanggal Anda beda (misal: 'Tanggal_ED', 'Expired_Date')
             
-           	 if nama_kolom_tanggal in markdown_df.columns:
-                # Mengubah format menjadi Text (String). 
-                # '%d/%m/%Y' akan menjadi '02/10/2026'. 
-                # Jika ingin format '02-Oct-2026', ganti menjadi '%d-%b-%Y'
+            if nama_kolom_tanggal in markdown_df.columns:
                 markdown_df[nama_kolom_tanggal] = pd.to_datetime(
                     markdown_df[nama_kolom_tanggal], errors='coerce'
-                ).dt.strftime('%d/%m/%Y').fillna('') # fillna('') agar jika ada yang kosong tidak error
+                ).dt.strftime('%d/%m/%Y').fillna('')
 
-           	 # 2. Susun Ulang Urutan Kolom Sesuai "Sheet 3"
-            	# Ganti list ini sesuai dengan urutan header tabel di Sheet 3 Anda!
-            	urutan_kolom_sheet3 = [
+            # 2. Susun ulang urutan kolom
+            urutan_kolom_sheet3 = [
                 'Article', 
                 'Nama_Barang', 
                 nama_kolom_tanggal, 
                 'Staff_Penanggung_Jawab', 
                 'Instruksi_Aksi', 
                 'Feedback_Staff'
-            	]
+            ]
             
-            	# Filter agar hanya memasukkan kolom yang memang ada (menghindari error)
-            	kolom_tersedia = [col for col in urutan_kolom_sheet3 if col in markdown_df.columns]
-            	if kolom_tersedia:
-                markdown_df = markdown_df[kolom_tersedia]
-                
-            	# ========================================================
+            kolom_tersedia = [col for col in urutan_kolom_sheet3 if col in markdown_df.columns]
             
-            	# Proses ke Excel
-            	excel_markdown = convert_df_to_excel(markdown_df)
-            	st.download_button(
-                	label="Download File Markdown Saja (Excel)",
-                	data=excel_markdown,
-                	file_name=f"File_Markdown_{st.session_state['store_name_dynamic'].replace(' ', 					'_')}.xlsx",
-                	mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            		)
-
-       
+            # Gabungkan kolom yang wajib ada (kolom_tersedia) 
+            # Jika ada kolom bawaan lain yang tidak masuk di urutan_kolom_sheet3 tapi mau dimasukkan, dia otomatis ditaruh di belakang.
+            kolom_lainnya = [col for col in markdown_df.columns if col not in kolom_tersedia]
+            
+            # Menyusun DataFrame akhir untuk didownload
+            markdown_df = markdown_df[kolom_tersedia + kolom_lainnya]
+            
+            excel_markdown = convert_df_to_excel(markdown_df)
+            st.download_button(
+                label="Download File Markdown Saja (Excel)",
+                data=excel_markdown,
+                file_name=f"File_Markdown_{st.session_state['store_name_dynamic'].replace(' ', '_')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+    else:
+        st.warning("Tidak ada data untuk diunduh.")
