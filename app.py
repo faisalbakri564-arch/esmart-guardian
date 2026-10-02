@@ -215,7 +215,6 @@ elif st.session_state['step'] == 2:
                     filtered_df['Staff_Penanggung_Jawab'] = filtered_df[dept_col].map(mapping_input).fillna("Belum Ditugaskan")
                     
                     remark_col = next((col for col in filtered_df.columns if 'remark' in str(col).lower() or 'feedback' in str(col).lower() or 'instruction' in str(col).lower()), None)
-                    brand_col = next((col for col in raw_df.columns if 'brand' in str(col).lower()), None)
 
                     def smart_ai_recommendation(row):
                         remark_text = ""
@@ -331,7 +330,7 @@ elif st.session_state['step'] == 4:
     if 'final_edited_data' in st.session_state:
         final_df = st.session_state['final_edited_data']
 
-        # LOGIKA FILTERING KOLOM: Hapus kolom yang tidak relevan
+        # LOGIKA FILTERING KOLOM UNTUK LAPORAN UTAMA SAJA
         cols_to_remove = ['city', 'region', 'dept', 'brand', 'dot', 'code.1', 'exp', 'cost', 'total value', 'sos']
         columns_to_keep = []
         
@@ -365,42 +364,60 @@ elif st.session_state['step'] == 4:
         with col_dl2:
             st.markdown("#### **📦 Khusus File Barang Markdown**")
             
-            # --- MODIFIKASI TERBARU (TANPA ERROR SPASI) ---
-            markdown_df = download_df[download_df.astype(str).apply(lambda x: x.str.contains("Markdown", case=False)).any(axis=1)].copy()
+            # --- MODIFIKASI TERBARU (MENGGUNAKAN FINAL_DF AGAR KOLOM TANGGAL/BULAN TIDAK HILANG) ---
             
-            # 1. Sesuaikan nama kolom tanggal di sini
-            nama_kolom_tanggal = 'Exp Date'  # Ganti jika nama kolom tanggal Anda beda (misal: 'Tanggal_ED', 'Expired_Date')
+            # 1. Ambil baris data yang mengandung kata 'Markdown' dari sumber utama
+            markdown_source_df = final_df[final_df.astype(str).apply(lambda x: x.str.contains("Markdown", case=False)).any(axis=1)].copy()
             
-            if nama_kolom_tanggal in markdown_df.columns:
-                markdown_df[nama_kolom_tanggal] = pd.to_datetime(
-                    markdown_df[nama_kolom_tanggal], errors='coerce'
-                ).dt.strftime('%d/%m/%Y').fillna('')
-
-            # 2. Susun ulang urutan kolom
-            urutan_kolom_sheet3 = [
-                'Article', 
-                'Nama_Barang', 
-                nama_kolom_tanggal, 
-                'Staff_Penanggung_Jawab', 
-                'Instruksi_Aksi', 
-                'Feedback_Staff'
-            ]
+            # 2. Siapkan susunan header persis seperti gambar
+            target_cols = ['CN', 'Artikel', 'Desc', 'UOM', 'OUM2', 'Avg', 'SOH', 'SOL', 'OOQ', 'GIT', 'Requested', 'Remaks']
             
-            kolom_tersedia = [col for col in urutan_kolom_sheet3 if col in markdown_df.columns]
+            # Buat DataFrame kosong dengan format kolom yang diminta
+            final_markdown_df = pd.DataFrame(index=markdown_source_df.index, columns=target_cols)
             
-            # Gabungkan kolom yang wajib ada (kolom_tersedia) 
-            # Jika ada kolom bawaan lain yang tidak masuk di urutan_kolom_sheet3 tapi mau dimasukkan, dia otomatis ditaruh di belakang.
-            kolom_lainnya = [col for col in markdown_df.columns if col not in kolom_tersedia]
+            if not markdown_source_df.empty:
+                # Kolom CN diisi dengan Nomor Urut
+                final_markdown_df['CN'] = range(1, len(markdown_source_df) + 1)
+                
+                # Deteksi otomatis nama kolom dari data mentah
+                col_article = next((c for c in markdown_source_df.columns if str(c).strip().lower() == 'article'), None)
+                col_desc = next((c for c in markdown_source_df.columns if 'article desc' in str(c).lower() or 'desc' in str(c).lower() and 'site' not in str(c).lower()), None)
+                col_soh = next((c for c in markdown_source_df.columns if str(c).strip().lower() == 'soh' or 'soh' in str(c).lower()), None)
+                col_remark = next((c for c in markdown_source_df.columns if 'remark' in str(c).lower()), None)
+                
+                # Deteksi kolom untuk Tanggal (Bulan & Tahun / Exp Date)
+                col_month = next((c for c in markdown_source_df.columns if str(c).strip().lower() == 'month'), None)
+                col_year = next((c for c in markdown_source_df.columns if str(c).strip().lower() == 'year'), None)
+                col_date = next((c for c in markdown_source_df.columns if 'date' in str(c).lower() or 'tanggal' in str(c).lower() or 'exp' in str(c).lower()), None)
+                
+                # Masukkan data ke format baru
+                if col_article:
+                    final_markdown_df['Artikel'] = markdown_source_df[col_article]
+                if col_desc:
+                    final_markdown_df['Desc'] = markdown_source_df[col_desc]
+                if col_soh:
+                    final_markdown_df['SOH'] = markdown_source_df[col_soh]
+                if col_remark:
+                    final_markdown_df['Remaks'] = markdown_source_df[col_remark]
+                    
+                # Logika Pembuatan Tanggal (Requested)
+                if col_month and col_year:
+                    # Jika ada kolom Bulan & Tahun, gabungkan (Misal: 11/2026)
+                    final_markdown_df['Requested'] = markdown_source_df[col_month].astype(str) + "/" + markdown_source_df[col_year].astype(str)
+                elif col_date:
+                    final_markdown_df['Requested'] = markdown_source_df[col_date]
             
-            # Menyusun DataFrame akhir untuk didownload
-            markdown_df = markdown_df[kolom_tersedia + kolom_lainnya]
+            # 3. Ubah semua nilai NaN (kosong/tidak diketahui nilainya) menjadi tanda '-'
+            final_markdown_df = final_markdown_df.fillna('-')
             
-            excel_markdown = convert_df_to_excel(markdown_df)
+            # Proses konversi ke Excel untuk file Markdown
+            excel_markdown = convert_df_to_excel(final_markdown_df)
             st.download_button(
                 label="Download File Markdown Saja (Excel)",
                 data=excel_markdown,
                 file_name=f"File_Markdown_{st.session_state['store_name_dynamic'].replace(' ', '_')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
+            
     else:
         st.warning("Tidak ada data untuk diunduh.")
