@@ -362,20 +362,20 @@ elif st.session_state['step'] == 4:
                 file_name=f"Laporan_Final_{st.session_state['store_name_dynamic'].replace(' ', '_')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
-		with col_dl2:
-            st.markdown("#### **📦 Khusus File Barang Markdown**")
-            # Tambahkan .copy() agar tidak muncul warning Pandas
-            markdown_df = download_df[download_df.astype(str).apply(lambda x: x.str.contains("Markdown", case=False)).any(axis=1)].copy()
+	with col_dl2:
+            	st.markdown("#### **📦 Khusus File Barang Markdown**")
+            	# Tambahkan .copy() agar tidak muncul warning Pandas
+            	markdown_df = download_df[download_df.astype(str).apply(lambda x: x.str.contains("Markdown", 			case=False)).any(axis=1)].copy()
             
-            # ========================================================
-            # MODIFIKASI: FORMAT TANGGAL & SUSUNAN KOLOM
-            # ========================================================
+           	 # ========================================================
+           	 # MODIFIKASI: FORMAT TANGGAL & SUSUNAN KOLOM
+            	# ========================================================
             
-            # 1. Ubah Format Tanggal Menjadi Teks
-            # Ganti dengan nama kolom tanggal di data Anda (misal: 'Exp Date', 'Tanggal')
-            nama_kolom_tanggal = 'Nama_Kolom_Tanggal_Anda' 
+            	# 1. Ubah Format Tanggal Menjadi Teks
+            	# Ganti dengan nama kolom tanggal di data Anda (misal: 'Exp Date', 'Tanggal')
+            	nama_kolom_tanggal = 'Nama_Kolom_Tanggal_Anda' 
             
-            if nama_kolom_tanggal in markdown_df.columns:
+           	 if nama_kolom_tanggal in markdown_df.columns:
                 # Mengubah format menjadi Text (String). 
                 # '%d/%m/%Y' akan menjadi '02/10/2026'. 
                 # Jika ingin format '02-Oct-2026', ganti menjadi '%d-%b-%Y'
@@ -383,31 +383,31 @@ elif st.session_state['step'] == 4:
                     markdown_df[nama_kolom_tanggal], errors='coerce'
                 ).dt.strftime('%d/%m/%Y').fillna('') # fillna('') agar jika ada yang kosong tidak error
 
-            # 2. Susun Ulang Urutan Kolom Sesuai "Sheet 3"
-            # Ganti list ini sesuai dengan urutan header tabel di Sheet 3 Anda!
-            urutan_kolom_sheet3 = [
+           	 # 2. Susun Ulang Urutan Kolom Sesuai "Sheet 3"
+            	# Ganti list ini sesuai dengan urutan header tabel di Sheet 3 Anda!
+            	urutan_kolom_sheet3 = [
                 'Article', 
                 'Nama_Barang', 
                 nama_kolom_tanggal, 
                 'Staff_Penanggung_Jawab', 
                 'Instruksi_Aksi', 
                 'Feedback_Staff'
-            ]
+            	]
             
-            # Filter agar hanya memasukkan kolom yang memang ada (menghindari error)
-            kolom_tersedia = [col for col in urutan_kolom_sheet3 if col in markdown_df.columns]
-            if kolom_tersedia:
+            	# Filter agar hanya memasukkan kolom yang memang ada (menghindari error)
+            	kolom_tersedia = [col for col in urutan_kolom_sheet3 if col in markdown_df.columns]
+            	if kolom_tersedia:
                 markdown_df = markdown_df[kolom_tersedia]
                 
-            # ========================================================
+            	# ========================================================
             
-            # Proses ke Excel
-            excel_markdown = convert_df_to_excel(markdown_df)
-            st.download_button(
-                label="Download File Markdown Saja (Excel)",
-                data=excel_markdown,
-                file_name=f"File_Markdown_{st.session_state['store_name_dynamic'].replace(' ', '_')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+            	# Proses ke Excel
+            	excel_markdown = convert_df_to_excel(markdown_df)
+            	st.download_button(
+                	label="Download File Markdown Saja (Excel)",
+                	data=excel_markdown,
+                	file_name=f"File_Markdown_{st.session_state['store_name_dynamic'].replace(' ', 					'_')}.xlsx",
+                	mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            		)
 
        
