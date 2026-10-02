@@ -222,7 +222,7 @@ elif st.session_state['step'] == 2:
                             remark_text = str(row[remark_col]).lower()
                         
                         if 'expired' in remark_text or 'lewat' in remark_text:
-                            return f"⚠️ [EXPIRED LEWAT]: Segera ajukan ajuan WO tambahan."
+                            return f"⚠️️ [EXPIRED LEWAT]: Segera ajukan ajuan WO tambahan."
                         elif 'blue dot' in remark_text or 'not approved' in remark_text:
                             return f"🚨 [BLUE DOT / HOLD]: Pisahkan fisik untuk Program GWP atau Retur ke DC."
                         elif any(kw in remark_text for kw in ['markdown', 'rtw', 'return', 'disetujui', 'approved']):
@@ -364,12 +364,10 @@ elif st.session_state['step'] == 4:
         with col_dl2:
             st.markdown("#### **📦 Khusus File Barang Markdown**")
             
-            # --- MODIFIKASI TERBARU (MENGGUNAKAN FINAL_DF AGAR KOLOM TANGGAL/BULAN TIDAK HILANG) ---
-            
             # 1. Ambil baris data yang mengandung kata 'Markdown' dari sumber utama
             markdown_source_df = final_df[final_df.astype(str).apply(lambda x: x.str.contains("Markdown", case=False)).any(axis=1)].copy()
             
-            # 2. Siapkan susunan header persis seperti gambar
+            # 2. Siapkan susunan header persis seperti template Clearance Label
             target_cols = ['CN', 'Artikel', 'Desc', 'UOM', 'OUM2', 'Avg', 'SOH', 'SOL', 'OOQ', 'GIT', 'Requested', 'Remaks']
             
             # Buat DataFrame kosong dengan format kolom yang diminta
@@ -400,10 +398,26 @@ elif st.session_state['step'] == 4:
                 if col_remark:
                     final_markdown_df['Remaks'] = markdown_source_df[col_remark]
                     
-                # Logika Pembuatan Tanggal (Requested)
+                # =========================================================================
+                # Logika Pembuatan Tanggal (Requested) - Menyesuaikan Format Kode Label
+                # =========================================================================
                 if col_month and col_year:
-                    # Jika ada kolom Bulan & Tahun, gabungkan (Misal: 11/2026)
-                    final_markdown_df['Requested'] = markdown_source_df[col_month].astype(str) + "/" + markdown_source_df[col_year].astype(str)
+                    # Bersihkan angka desimal jika ada (.0) lalu jadikan integer lalu jadikan string teks
+                    bulan_bersih = markdown_source_df[col_month].fillna(0).astype(float).astype(int).astype(str)
+                    tahun_bersih = markdown_source_df[col_year].fillna(0).astype(float).astype(int).astype(str)
+                    
+                    # Tambahkan angka '0' di depan bulan jika nilainya satuan (Contoh: '1' jadi '01', '11' tetap '11')
+                    bulan_str = bulan_bersih.str.zfill(2)
+                    
+                    # Ambil 1 digit paling kanan dari tahun (Contoh: Tahun '2026' menjadi '6')
+                    tahun_digit = tahun_bersih.str[-1]
+                    
+                    # Gabungkan menjadi Format: MM + Y + 01 (Contoh: 11 + 6 + 01 = 11601)
+                    final_markdown_df['Requested'] = bulan_str + tahun_digit + "01"
+                    
+                    # Bersihkan data invalid jika tahun/bulan kosong (diberi 0 sebelumnya)
+                    final_markdown_df.loc[bulan_bersih == '0', 'Requested'] = '-'
+                    
                 elif col_date:
                     final_markdown_df['Requested'] = markdown_source_df[col_date]
             
