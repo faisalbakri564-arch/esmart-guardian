@@ -362,8 +362,7 @@ elif st.session_state['step'] == 4:
                 file_name=f"Laporan_Final_{st.session_state['store_name_dynamic'].replace(' ', '_')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
-
-       with col_dl2:
+		with col_dl2:
             st.markdown("#### **📦 Khusus File Barang Markdown**")
             # Tambahkan .copy() agar tidak muncul warning Pandas
             markdown_df = download_df[download_df.astype(str).apply(lambda x: x.str.contains("Markdown", case=False)).any(axis=1)].copy()
@@ -410,3 +409,5 @@ elif st.session_state['step'] == 4:
                 file_name=f"File_Markdown_{st.session_state['store_name_dynamic'].replace(' ', '_')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
+
+       
