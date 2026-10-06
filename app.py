@@ -169,7 +169,8 @@ if st.session_state['step'] == 1:
 
     # KONTANER 2: UPLOAD DATA UTAMA (DALAM KOTAK RAPI)
     with st.container(border=True):
-        st.markdown("#### 📁 Unggah Data Laporan (File Master)")
+        st.markdown("#### 📁 Unggah Data Laporan (File Pak Yanyan)")
+        st.markdown("Save As File pada E-mail Pak Yanyan yang berupa Laporan ED dan Approval Markdown")
         st.markdown("Silakan pilih file laporan dari pusat untuk dianalisis. Mendukung format `.xlsx`, `.xlsb`, atau `.csv`.")
         
         uploaded_files = st.file_uploader(
