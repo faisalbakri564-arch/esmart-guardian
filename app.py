@@ -1,6 +1,7 @@
 import pandas as pd
 import streamlit as st
 from io import BytesIO
+import os
 
 # ==========================================
 # KONFIGURASI HALAMAN & CUSTOM CSS
@@ -77,8 +78,15 @@ if 'template_mapping_dict' not in st.session_state:
 # SIDEBAR
 # ==========================================
 with st.sidebar:
-    # URL Gambar menggunakan logo Guardian dari internet
-    st.image("https://res.cloudinary.com/malls-id/image/upload/v1584069814/malls/brands/guardian.png", width=180) 
+    # Menggunakan gambar lokal agar tidak pernah error atau diblokir internet
+    if os.path.exists("logo.png"):
+        st.image("logo.png", width=180)
+    elif os.path.exists("logo.jpg"):
+        st.image("logo.jpg", width=180)
+    else:
+        st.markdown("<h1 style='font-size: 50px;'>🏥</h1>", unsafe_allow_html=True)
+        st.caption("*(Simpan gambar berukuran persegi dengan nama 'logo.png' di folder aplikasi ini untuk memunculkan logo asli)*")
+        
     st.markdown("### E-Smart Guardian")
     st.caption("Sistem Manajemen ED & Mitigasi Shrinkage Retail.")
     st.markdown("---")
