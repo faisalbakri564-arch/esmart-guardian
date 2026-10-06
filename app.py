@@ -439,7 +439,7 @@ elif st.session_state['step'] == 4:
             with col_dl2:
                 with st.container(border=True):
                     st.markdown("### 🏷️ Khusus Label Markdown")
-                    st.markdown("Laporan siap tempel (*copy-paste*) khusus untuk aplikasi *Clearance Label*.")
+                    st.markdown("Laporan siap tempel (*copy-paste*) khusus untuk Form *Clearance Label* Pak Agus Salim")
                     st.markdown("<br>", unsafe_allow_html=True)
                     
                     markdown_source_df = final_df[final_df.astype(str).apply(lambda x: x.str.contains("Markdown", case=False)).any(axis=1)].copy()
