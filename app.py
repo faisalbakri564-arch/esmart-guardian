@@ -77,7 +77,8 @@ if 'template_mapping_dict' not in st.session_state:
 # SIDEBAR
 # ==========================================
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2830/2830305.png", width=80) # Ikon dummy opsional
+    # URL Gambar telah diubah menjadi ikon Perisai (Shield) yang lebih relevan
+    st.image("https://cdn-icons-png.flaticon.com/512/1161/1161388.png", width=80) 
     st.markdown("### 🛡️ E-Smart Guardian")
     st.caption("Sistem Manajemen ED & Mitigasi Shrinkage Retail.")
     st.markdown("---")
@@ -478,6 +479,6 @@ elif st.session_state['step'] == 4:
     st.markdown("<br>", unsafe_allow_html=True)
     col_nav1, _, _ = st.columns([1, 1, 1])
     with col_nav1:
-        if st.button("⬅️ Kembali ke Review"):
+        if st.button("⬅️️ Kembali ke Review"):
             st.session_state['step'] = 3
             st.rerun()
