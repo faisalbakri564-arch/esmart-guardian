@@ -100,7 +100,7 @@ with st.sidebar:
 # HEADER & PROGRESS BAR
 # ==========================================
 st.title("🛡️ E-Smart Guardian")
-st.markdown("Membantu memproses data *Expired Date*, pemetaan tugas staf, dan *Clearance Label* secara otomatis.")
+st.markdown("Membantu memproses data *Expired Date*, pemetaan tanggung jawab staf, dan *Clearance Label* secara otomatis.")
 
 # Progress Bar Visual
 progress_value = int((st.session_state['step'] / 4) * 100)
@@ -108,7 +108,7 @@ st.progress(st.session_state['step'] / 4, text=f"Tahap {st.session_state['step']
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ==========================================
-# TAHAP 1: TEMPLATE & UPLOAD DATA
+# TAHAP 1: TEMPLATE & UPLOAD DATA PAK YANYAN
 # ==========================================
 if st.session_state['step'] == 1:
     
