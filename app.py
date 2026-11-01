@@ -3,6 +3,7 @@ import streamlit as st
 from io import BytesIO
 import os
 import sqlite3
+import re
 
 # ==========================================
 # DATABASE HELPER (ANTI HILANG DATA)
@@ -63,15 +64,23 @@ if 'db_loaded' not in st.session_state:
     st.session_state['store_code'] = load_config('store_code', "")
     st.session_state['db_loaded'] = True
 
-# BACA FILE PRICE ZONE
+# Cek & Baca File Price Zone
+file_price_zone = None
+if os.path.exists("FILE PRICE ZONE_2.xlsx"):
+    file_price_zone = "FILE PRICE ZONE_2.xlsx"
+elif os.path.exists("FILE PRICE ZONE.xlsx"):
+    file_price_zone = "FILE PRICE ZONE.xlsx"
+
 if 'master_harga' not in st.session_state:
-    try:
-        # Gunakan file yang ada (FILE PRICE ZONE.xlsx atau FILE PRICE ZONE_2.xlsx)
-        file_pz = "FILE PRICE ZONE_2.xlsx" if os.path.exists("FILE PRICE ZONE_2.xlsx") else "FILE PRICE ZONE.xlsx"
-        xls = pd.ExcelFile(file_pz)
-        st.session_state['master_harga'] = pd.read_excel(xls, sheet_name=xls.sheet_names[0], dtype=str) # Sheet 1: Harga
-        st.session_state['master_zone'] = pd.read_excel(xls, sheet_name=xls.sheet_names[1], dtype=str) # Sheet 2: Toko -> PZ
-    except:
+    if file_price_zone:
+        try:
+            xls = pd.ExcelFile(file_price_zone)
+            st.session_state['master_harga'] = pd.read_excel(xls, sheet_name=0, dtype=str)
+            st.session_state['master_zone'] = pd.read_excel(xls, sheet_name=1, dtype=str)
+        except:
+            st.session_state['master_harga'] = pd.DataFrame()
+            st.session_state['master_zone'] = pd.DataFrame()
+    else:
         st.session_state['master_harga'] = pd.DataFrame()
         st.session_state['master_zone'] = pd.DataFrame()
 
@@ -92,7 +101,7 @@ with st.sidebar:
     )
     st.markdown("---")
     if not st.session_state['master_harga'].empty:
-        st.success(f"✅ Master Price Zone Aktif")
+        st.success(f"✅ {file_price_zone} Aktif")
     else:
         st.error("❌ FILE PRICE ZONE Tidak Ditemukan!")
         
@@ -134,7 +143,7 @@ if menu_selection == "1. Setup & Upload Data":
     with st.container(border=True):
         st.markdown("#### 📁 Unggah Laporan Pusat (ED & Markdown)")
         st.caption("Unggah File Data Expired **DAN** File Approval Markdown sekaligus di sini.")
-        uploaded_files = st.file_uploader("Upload 2 file laporan dari pusat", type=["csv", "xlsx", "xls"], accept_multiple_files=True)
+        uploaded_files = st.file_uploader("Upload 2 file laporan dari pusat", type=["csv", "xlsx", "xls", "xlsb"], accept_multiple_files=True)
         
         if st.button("Gabungkan & Simpan Laporan"):
             if uploaded_files and len(uploaded_files) > 0:
@@ -142,36 +151,50 @@ if menu_selection == "1. Setup & Upload Data":
                 for file in uploaded_files:
                     if file.name.endswith('.csv'): 
                         df_temp = pd.read_csv(file, sep=';', header=1, on_bad_lines='skip', dtype=str)
+                    elif file.name.endswith('.xlsb'):
+                        df_temp = pd.read_excel(file, header=1, engine='pyxlsb', dtype=str)
                     else: 
                         df_temp = pd.read_excel(file, header=1, dtype=str)
+                    
+                    df_temp.columns = [str(c).strip() for c in df_temp.columns]
                     dataframes.append(df_temp)
                 
-                # JIKA ADA LEBIH DARI 1 FILE, GABUNGKAN BERDASARKAN KOLOM ARTICLE
-                if len(dataframes) > 1:
-                    base_df = dataframes[0]
-                    for i in range(1, len(dataframes)):
-                        # Cari kolom article di kedua dataframe untuk di-merge
-                        art_col_1 = next((c for c in base_df.columns if 'article' in str(c).lower()), None)
-                        art_col_2 = next((c for c in dataframes[i].columns if 'article' in str(c).lower()), None)
-                        
-                        if art_col_1 and art_col_2:
-                            # Gabungkan (Merge) secara cerdas agar jumlah baris tidak berkurang/bertambah ganda
-                            base_df = pd.merge(base_df, dataframes[i], left_on=art_col_1, right_on=art_col_2, how='outer', suffixes=('', '_drop'))
-                            # Hapus kolom duplikat hasil merge
-                            base_df = base_df.loc[:, ~base_df.columns.str.endswith('_drop')]
-                        else:
-                            # Fallback ke concat jika tidak menemukan Article
-                            base_df = pd.concat([base_df, dataframes[i]], ignore_index=True)
-                    combined_df = base_df
-                else:
+                # PERBAIKAN LOGIKA MERGE 2 FILE AGAR DATA TIDAK HILANG
+                if len(dataframes) == 1:
                     combined_df = dataframes[0]
+                else:
+                    # Cari DataFrame mana yang lebih panjang (biasanya File Expired adalah master utamanya)
+                    if len(dataframes[0]) >= len(dataframes[1]):
+                        master_df = dataframes[0]
+                        slave_df = dataframes[1]
+                    else:
+                        master_df = dataframes[1]
+                        slave_df = dataframes[0]
+
+                    art_col_master = next((c for c in master_df.columns if 'article' in str(c).lower()), None)
+                    art_col_slave = next((c for c in slave_df.columns if 'article' in str(c).lower()), None)
+
+                    if art_col_master and art_col_slave:
+                        # Left merge memastikan seluruh data master (36 item) tetap utuh
+                        combined_df = pd.merge(master_df, slave_df, left_on=art_col_master, right_on=art_col_slave, how='left', suffixes=('', '_drop'))
+                        # Hapus duplikasi kolom akibat merge
+                        combined_df = combined_df.loc[:, ~combined_df.columns.str.endswith('_drop')]
+                    else:
+                        combined_df = master_df
                 
-                combined_df.columns = [str(c).strip() for c in combined_df.columns]
                 st.session_state['raw_data'] = combined_df
                 save_df('raw_data', combined_df)
-                st.success(f"✅ {len(combined_df)} Baris Data Tersimpan! (Total Item Terbaca: {len(combined_df)})")
+                st.success(f"✅ {len(combined_df)} Baris Data Tersimpan Utuh! Lanjut ke Menu 2.")
             else:
                 st.warning("Harap unggah File Laporan.")
+                
+    with st.container(border=True):
+        st.markdown("#### 💾 Ekstrak & Download Database Akhir")
+        st.caption("Tarik riwayat data yang tersimpan dari hari-hari sebelumnya.")
+        if not st.session_state['processed_data'].empty:
+            out_db = BytesIO()
+            with pd.ExcelWriter(out_db, engine='openpyxl') as w: st.session_state['processed_data'].to_excel(w, index=False)
+            st.download_button("📥 Download Database Histori Akhir", data=out_db.getvalue(), file_name="Database_History_Guardian.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 # ==========================================
 # HALAMAN 2: ANALISIS & UNDUHAN LAPORAN
@@ -234,42 +257,30 @@ elif menu_selection == "2. Analisis & Unduhan":
                         return 0
                     filtered_df['Diskon_Persen'] = filtered_df[remark_col].apply(get_discount) if remark_col else 0
 
-                    # ==========================================
-                    # LOGIKA PRICE ZONE TERBARU SESUAI GAMBAR 1 & 2
-                    # ==========================================
-                    df_zone = st.session_state['master_zone'] # Sheet 2 (Toko -> PZ)
-                    df_harga = st.session_state['master_harga'] # Sheet 1 (Article -> Harga berdasarkan PZ)
+                    df_zone = st.session_state['master_zone']
+                    df_harga = st.session_state['master_harga']
                     
                     current_pz_code = None 
                     
-                    # 1. Cari Kode PZ di Sheet 2 (Kolom PZ) berdasarkan Kode Toko (Kolom Title)
                     if not df_zone.empty:
                         title_col = next((c for c in df_zone.columns if 'title' in str(c).lower() or 'toko' in str(c).lower() or 'code' in str(c).lower()), None)
                         pz_col = next((c for c in df_zone.columns if 'pz' in str(c).lower() or 'zone' in str(c).lower()), None)
                         
                         if title_col and pz_col:
-                            # Bersihkan kolom kode toko di Sheet 2 dari .0
                             df_zone['clean_title'] = df_zone[title_col].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
                             zone_row = df_zone[df_zone['clean_title'] == store_code_input]
-                            
-                            if not zone_row.empty:
-                                current_pz_code = str(zone_row.iloc[0][pz_col]).strip() # Contoh Output: "P37", "PGL"
+                            if not zone_row.empty: current_pz_code = str(zone_row.iloc[0][pz_col]).strip()
 
-                    # 2. Cari Harga di Sheet 1 (Berdasarkan Article & Kode PZ yang ditemukan)
                     art_col_rep = next((c for c in filtered_df.columns if 'article' in str(c).lower() and 'desc' not in str(c).lower()), None)
                     
                     if not df_harga.empty and art_col_rep and current_pz_code:
                         art_col_har = next((c for c in df_harga.columns if 'article' in str(c).lower() or 'plu' in str(c).lower()), None)
-                        
-                        # Cari nama kolom di Sheet 1 yang SAMA PERSIS dengan current_pz_code (misal "PGL")
                         target_price_col = next((c for c in df_harga.columns if current_pz_code.lower() == str(c).strip().lower()), None)
                         
                         if art_col_har and target_price_col:
-                            # Bersihkan Article di Sheet 1
                             kunci_article = df_harga[art_col_har].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
                             harga_dict = dict(zip(kunci_article, df_harga[target_price_col]))
                             
-                            # Bersihkan Article di Laporan
                             artikel_toko = filtered_df[art_col_rep].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
                             filtered_df['Harga_Normal'] = artikel_toko.map(harga_dict).fillna(0)
                         else:
@@ -283,7 +294,7 @@ elif menu_selection == "2. Analisis & Unduhan":
                     
                     st.session_state['processed_data'] = filtered_df
                     save_df('processed_data', filtered_df)
-                    st.success(f"✅ Analisis Selesai! Zone Toko {store_code_input} Terdeteksi: {current_pz_code if current_pz_code else 'Tidak Ditemukan'}.")
+                    st.success(f"✅ Analisis Selesai! ({len(filtered_df)} Item Tersimpan). Zone Toko {store_code_input} Terdeteksi: {current_pz_code if current_pz_code else 'Tidak Ditemukan'}.")
 
             if not st.session_state['processed_data'].empty:
                 st.markdown("---")
@@ -298,11 +309,8 @@ elif menu_selection == "2. Analisis & Unduhan":
                     target_columns = []
                     for c in final_df.columns:
                         c_low = str(c).lower().strip()
-                        # Buang kolom exp biasa tapi pertahankan Qty Exp
                         if 'exp' in c_low and 'qty' not in c_low: continue 
-                        # Buang Code.1
                         if 'code.1' in c_low or 'code1' in c_low: continue
-                        
                         if any(k in c_low for k in ['code', 'site desc', 'article', 'desc', 'dept', 'month', 'year', 'qty', 'remark', 'staff', 'status', 'feedback', 'instruksi']):
                             target_columns.append(c)
                             
@@ -353,7 +361,6 @@ elif menu_selection == "2. Analisis & Unduhan":
                                 h_akhir = f"{int(row['Harga_Akhir']):,}".replace(',', '.')
                                 art_val = str(row[art_c]).replace('.0','') if art_c in row else ""
                                 
-                                # Auto Qty Multiplier
                                 qty = 1
                                 if qty_c and pd.notnull(row[qty_c]):
                                     try:
@@ -408,21 +415,28 @@ elif menu_selection == "3. Portal Staff (Scanner)":
         
         if st.button("Kirim Laporan Selesai"):
             if scan_input:
-                # Cek article, pastikan bebas .0
-                df_current['clean_article'] = df_current.astype(str).apply(lambda x: x.str.replace(r'\.0$', '', regex=True)).apply(lambda x: ' '.join(x), axis=1)
-                match_idx = df_current[df_current['clean_article'].str.contains(scan_input, case=False, na=False)].index
+                # PERBAIKAN LOGIKA SCAN (Mencegah TypeError Astype)
+                art_col = next((c for c in df_current.columns if 'article' in str(c).lower() and 'desc' not in str(c).lower()), None)
                 
-                if not match_idx.empty:
-                    df_current.loc[match_idx, 'Status_Pengerjaan'] = "Selesai"
-                    df_current.loc[match_idx, 'Feedback_Staff'] = staff_note if staff_note else f"Selesai (Diinput: {aktif_staff})"
-                    df_current = df_current.drop(columns=['clean_article'])
+                if art_col:
+                    # Bersihkan kolom Article di dataframe dan jadikan string
+                    clean_article_series = df_current[art_col].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+                    # Cari barcode di seri yang sudah bersih
+                    match_idx = df_current[clean_article_series.str.contains(scan_input, case=False, na=False)].index
                     
-                    st.session_state['processed_data'] = df_current
-                    save_df('processed_data', df_current)
-                    st.success(f"✅ Artikel {scan_input} diselesaikan!")
+                    if not match_idx.empty:
+                        df_current.loc[match_idx, 'Status_Pengerjaan'] = "Selesai"
+                        df_current.loc[match_idx, 'Feedback_Staff'] = staff_note if staff_note else f"Selesai (Diinput: {aktif_staff})"
+                        
+                        st.session_state['processed_data'] = df_current
+                        save_df('processed_data', df_current)
+                        st.success(f"✅ Artikel {scan_input} diselesaikan!")
+                    else:
+                        st.error("❌ Artikel tidak ditemukan.")
                 else:
-                    df_current = df_current.drop(columns=['clean_article'])
-                    st.error("❌ Artikel tidak ditemukan.")
+                    st.error("❌ Kolom Article tidak ditemukan di data.")
+            else:
+                st.warning("Masukkan nomor artikel terlebih dahulu.")
 
 # ==========================================
 # HALAMAN 4: DASHBOARD SL & MOD
