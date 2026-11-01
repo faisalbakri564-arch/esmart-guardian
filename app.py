@@ -64,10 +64,17 @@ if 'db_loaded' not in st.session_state:
     st.session_state['store_code'] = load_config('store_code', "")
     st.session_state['db_loaded'] = True
 
+# Cek & Baca File Price Zone (Versi 2 atau Versi 1)
+file_price_zone = None
+if os.path.exists("FILE PRICE ZONE_2.xlsx"):
+    file_price_zone = "FILE PRICE ZONE_2.xlsx"
+elif os.path.exists("FILE PRICE ZONE.xlsx"):
+    file_price_zone = "FILE PRICE ZONE.xlsx"
+
 if 'master_harga' not in st.session_state:
-    if os.path.exists("FILE PRICE ZONE.xlsx"):
+    if file_price_zone:
         try:
-            xls = pd.ExcelFile("FILE PRICE ZONE.xlsx")
+            xls = pd.ExcelFile(file_price_zone)
             st.session_state['master_harga'] = pd.read_excel(xls, sheet_name=0, dtype=str)
             st.session_state['master_zone'] = pd.read_excel(xls, sheet_name=1, dtype=str)
         except:
@@ -81,12 +88,11 @@ if 'master_harga' not in st.session_state:
 # SIDEBAR MENU
 # ==========================================
 with st.sidebar:
-    # Mengambil logo langsung dari GitHub agar tidak pernah hilang
     logo_url = "https://raw.githubusercontent.com/faisalbakri564-arch/esmart-guardian/main/logo.png"
     st.image(logo_url, width=180, use_container_width=False)
     
     st.markdown("### E-Smart Guardian")
-    st.caption("Aman dari Refresh & Mati Lampu (Auto-Save DB)")
+    st.caption("Aman dari Refresh & Staf Libur (Auto-Save DB)")
     st.markdown("---")
     
     menu_selection = st.radio(
@@ -95,9 +101,9 @@ with st.sidebar:
     )
     st.markdown("---")
     if not st.session_state['master_harga'].empty:
-        st.success("✅ File Price Zone Aktif")
+        st.success(f"✅ {file_price_zone} Aktif")
     else:
-        st.error("❌ FILE PRICE ZONE.xlsx Tidak Ditemukan!")
+        st.error("❌ FILE PRICE ZONE Tidak Ditemukan!")
         
     if st.button("🗑️ Reset Semua Data (Hapus Database)"):
         if os.path.exists(DB_NAME): os.remove(DB_NAME)
@@ -132,7 +138,7 @@ if menu_selection == "1. Setup & Upload Data":
                 st.session_state['template_mapping_dict'] = dict(zip(df_clean['Dept'].astype(str).str.strip(), df_clean['Nama Staff'].astype(str).str.strip()))
                 save_df('staff_list', pd.DataFrame({'Staff': st.session_state['staff_list']}))
                 save_df('template_mapping', df_clean)
-                st.success("✅ Daftar Staf berhasil dimuat dan tersimpan di Database!")
+                st.success("✅ Daftar Staf berhasil dimuat & permanen di Database!")
                 
     with st.container(border=True):
         st.markdown("#### 📁 Unggah Laporan Pusat (ED & Markdown)")
@@ -149,17 +155,17 @@ if menu_selection == "1. Setup & Upload Data":
                 combined_df.columns = [str(c).strip() for c in combined_df.columns]
                 st.session_state['raw_data'] = combined_df
                 save_df('raw_data', combined_df)
-                st.success(f"✅ {len(combined_df)} Baris Data Laporan Tersimpan di Database! Lanjut ke Menu 2 di kiri.")
+                st.success(f"✅ {len(combined_df)} Baris Data Tersimpan! Lanjut ke Menu 2.")
             else:
                 st.warning("Harap unggah File Laporan.")
                 
     with st.container(border=True):
-        st.markdown("#### 💾 Ekstrak & Download Database")
-        st.caption("Download seluruh data yang ada di sistem saat ini sebagai backup (Excel).")
+        st.markdown("#### 💾 Ekstrak & Download Database Akhir")
+        st.caption("Tarik riwayat data yang tersimpan dari hari-hari sebelumnya.")
         if not st.session_state['processed_data'].empty:
             out_db = BytesIO()
             with pd.ExcelWriter(out_db, engine='openpyxl') as w: st.session_state['processed_data'].to_excel(w, index=False)
-            st.download_button("📥 Download Seluruh Data Database", data=out_db.getvalue(), file_name="Database_Full_Guardian.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            st.download_button("📥 Download Database Histori Akhir", data=out_db.getvalue(), file_name="Database_History_Guardian.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 # ==========================================
 # HALAMAN 2: ANALISIS & UNDUHAN LAPORAN
@@ -177,10 +183,9 @@ elif menu_selection == "2. Analisis & Unduhan":
             
             raw_df = st.session_state['raw_data']
             
-            # Filter Toko Akurat (membersihkan '.0' jika ada)
             code_col = next((c for c in raw_df.columns if 'code' in str(c).lower() or 'site' in str(c).lower()), None)
             if code_col:
-                raw_df['clean_code'] = raw_df[code_col].astype(str).str.replace('.0', '', regex=False).str.strip()
+                raw_df['clean_code'] = raw_df[code_col].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
                 filtered_df = raw_df[raw_df['clean_code'].str.contains(store_code_input, case=False, na=False)].copy()
                 filtered_df = filtered_df.drop(columns=['clean_code'])
             else:
@@ -200,13 +205,12 @@ elif menu_selection == "2. Analisis & Unduhan":
                     with cols[i % 4]: mapping_input[dept] = st.selectbox(f"{dept}", st.session_state['staff_list'], index=def_idx)
 
                 st.markdown("<br>", unsafe_allow_html=True)
-                if st.button("🚀 Proses Logika Price Zone, Diskon & AI"):
+                if st.button("🚀 Proses Logika Price Zone & Kalkulasi Qty Label"):
                     
                     filtered_df['Staff_Penanggung_Jawab'] = filtered_df[dept_col].map(mapping_input).fillna("-")
                     filtered_df['Status_Pengerjaan'] = "Belum"
                     filtered_df['Feedback_Staff'] = "-"
 
-                    # 1. AI Instruksi Aksi Otomatisasi
                     remark_col = next((col for col in filtered_df.columns if 'remark' in str(col).lower() or 'instruction' in str(col).lower()), None)
                     def smart_ai(row):
                         r_text = str(row[remark_col]).lower() if remark_col else ""
@@ -216,7 +220,6 @@ elif menu_selection == "2. Analisis & Unduhan":
                         else: return "Cek Fisik & Sesuaikan Display."
                     filtered_df['Instruksi_Aksi_AI'] = filtered_df.apply(smart_ai, axis=1)
 
-                    # 2. Besaran Diskon Markdown
                     def get_discount(remark):
                         r = str(remark).lower()
                         if '90' in r: return 90
@@ -225,47 +228,60 @@ elif menu_selection == "2. Analisis & Unduhan":
                         return 0
                     filtered_df['Diskon_Persen'] = filtered_df[remark_col].apply(get_discount) if remark_col else 0
 
-                    # 3. Logika Pencocokan Price Zone Terakurat
+                    # PENCARIAN LOGIKA HARGA DENGAN REGEX SUPER AKURAT
                     df_zone = st.session_state['master_zone']
                     df_harga = st.session_state['master_harga']
                     
-                    current_zone_name = "Zone_1" # Fallback
+                    current_zone_name = "" 
                     if not df_zone.empty:
-                        # Membersihkan data toko di Sheet 2 agar cocok saat dicari
                         for _, row in df_zone.iterrows():
+                            # Cari baris toko, hilangkan bug desimal .0 dari excel
                             if any(store_code_input in str(val).replace('.0','').strip() for val in row.values):
                                 zone_cols = [c for c in df_zone.columns if 'zone' in str(c).lower() or 'price' in str(c).lower()]
-                                if zone_cols: current_zone_name = str(row[zone_cols[0]]).strip()
+                                if zone_cols: 
+                                    current_zone_name = str(row[zone_cols[0]]).strip()
+                                else:
+                                    current_zone_name = str(row.iloc[-1]).strip()
                                 break
                     
+                    # Ekstrak digit untuk mencari Zone di Sheet 1 (Mencegah salah ketik spasi di header excel)
+                    match = re.search(r'\d+', current_zone_name)
+                    zone_num = match.group(0) if match else "1"
+                    
+                    zone_price_col = None
+                    for c in df_harga.columns:
+                        if 'zone' in str(c).lower() and zone_num in str(c).lower():
+                            zone_price_col = c
+                            break
+                    if not zone_price_col: # Fallback jika header hanya berupa angka "1"
+                        for c in df_harga.columns:
+                            if zone_num == str(c).strip():
+                                zone_price_col = c
+                                break
+
                     art_col_rep = next((c for c in filtered_df.columns if 'article' in str(c).lower() and 'desc' not in str(c).lower()), None)
                     
-                    if not df_harga.empty and art_col_rep:
-                        # Mencari kolom article di Sheet 1
+                    if not df_harga.empty and art_col_rep and zone_price_col:
                         art_col_har = next((c for c in df_harga.columns if 'article' in str(c).lower() or 'plu' in str(c).lower()), None)
-                        # Mencari kolom yang namanya persis dengan Zone toko ini (misal "ZONE 2")
-                        zone_price_col = next((c for c in df_harga.columns if current_zone_name.lower() in str(c).lower()), None)
-                        
-                        if art_col_har and zone_price_col:
-                            # Pemetaan Harga Normal (Mencegah error .0 di Excel)
-                            kunci_article = df_harga[art_col_har].astype(str).str.replace('.0','', regex=False).str.strip()
+                        if art_col_har:
+                            # Filter anti error .0 di Excel
+                            kunci_article = df_harga[art_col_har].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
                             harga_dict = dict(zip(kunci_article, df_harga[zone_price_col]))
                             
-                            artikel_toko = filtered_df[art_col_rep].astype(str).str.replace('.0','', regex=False).str.strip()
+                            artikel_toko = filtered_df[art_col_rep].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
                             filtered_df['Harga_Normal'] = artikel_toko.map(harga_dict).fillna(0)
                         else:
                             filtered_df['Harga_Normal'] = 0
                     else:
                         filtered_df['Harga_Normal'] = 0
 
-                    # 4. Kalkulasi Harga Label Markdown Akhir
                     filtered_df['Harga_Normal'] = pd.to_numeric(filtered_df['Harga_Normal'], errors='coerce').fillna(0)
                     filtered_df['Diskon_Persen'] = pd.to_numeric(filtered_df['Diskon_Persen'], errors='coerce').fillna(0)
                     filtered_df['Harga_Akhir'] = filtered_df['Harga_Normal'] * (1 - (filtered_df['Diskon_Persen'] / 100))
                     
                     st.session_state['processed_data'] = filtered_df
                     save_df('processed_data', filtered_df)
-                    st.success(f"✅ Price Zone ({current_zone_name}) & Diskon Berhasil Dikalkulasi untuk {len(filtered_df)} Data!")
+                    st.success(f"✅ Analisis Selesai! Zone Terdeteksi: ZONE {zone_num}.")
 
             if not st.session_state['processed_data'].empty:
                 st.markdown("---")
@@ -274,18 +290,17 @@ elif menu_selection == "2. Analisis & Unduhan":
                 
                 c_dl1, c_dl2 = st.columns(2)
                 
-                # UNDUHAN 1: LAPORAN TUGAS BERSIH
                 with c_dl1:
                     st.markdown("#### 1. Laporan Tugas Staf (Bersih)")
                     
-                    # Daftar kolom spesifik yang diminta (Qty Expired ADA, Exp HILANG)
                     target_columns = []
                     for c in final_df.columns:
                         c_low = str(c).lower().strip()
-                        if 'exp' in c_low and 'qty' not in c_low:
-                            continue # Buang kolom "Exp" biasa
+                        # Buang kolom exp biasa tapi pertahankan Qty Exp
+                        if 'exp' in c_low and 'qty' not in c_low: continue 
+                        # Buang Code.1 secara eksplisit
+                        if 'code.1' in c_low: continue
                         
-                        # Pertahankan kolom-kolom yang diminta
                         if any(k in c_low for k in ['code', 'site desc', 'article', 'desc', 'dept', 'month', 'year', 'qty', 'remark', 'staff', 'status', 'feedback', 'instruksi']):
                             target_columns.append(c)
                             
@@ -300,10 +315,9 @@ elif menu_selection == "2. Analisis & Unduhan":
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
 
-                # UNDUHAN 2: LABEL CLEARANCE
                 with c_dl2:
-                    st.markdown("#### 2. Label Clearance Siap Cetak")
-                    st.caption("Label 1.5 x 3 HTML. Buka di Browser (Chrome) dan tekan **Ctrl+P** untuk Print.")
+                    st.markdown("#### 2. Label Clearance HTML (Auto-Qty)")
+                    st.caption("Label 1.5 x 3 HTML. Jumlah label akan otomatis dikalikan sesuai total **Qty Exp**!")
                     
                     if 'Diskon_Persen' in final_df.columns:
                         markdown_df = final_df[pd.to_numeric(final_df['Diskon_Persen'], errors='coerce') > 0].copy()
@@ -327,8 +341,9 @@ elif menu_selection == "2. Analisis & Unduhan":
                             @media print { .label { border: 1px dashed #fff; } .page { padding: 0; } }
                             </style></head><body><div class="page">
                             """
-                            # Cari nama kolom yang tepat untuk dipasang di Label
+                            
                             art_c = next((c for c in markdown_df.columns if 'article' in str(c).lower() and 'desc' not in str(c).lower()), 'Article')
+                            qty_c = next((c for c in markdown_df.columns if 'qty' in str(c).lower()), None)
                             
                             for _, row in markdown_df.iterrows():
                                 disc = int(row['Diskon_Persen'])
@@ -336,7 +351,16 @@ elif menu_selection == "2. Analisis & Unduhan":
                                 h_akhir = f"{int(row['Harga_Akhir']):,}".replace(',', '.')
                                 art_val = str(row[art_c]).replace('.0','') if art_c in row else ""
                                 
-                                html_content += f"""
+                                # Logika Cetak Berulang sesuai QTY EXP
+                                qty = 1
+                                if qty_c and pd.notnull(row[qty_c]):
+                                    try:
+                                        qty = int(float(str(row[qty_c]).replace(',', '.')))
+                                        if qty < 1: qty = 1
+                                    except:
+                                        qty = 1 # Fallback jika Qty kosong/tulisan
+                                        
+                                label_html = f"""
                                 <div class="label">
                                     <div class="top">
                                         <div class="disc">Disc.<br>{disc}%</div>
@@ -349,12 +373,16 @@ elif menu_selection == "2. Analisis & Unduhan":
                                     <div class="art">{art_val}</div>
                                 </div>
                                 """
+                                # Gandakan label sesuai Qty Approval
+                                for _ in range(qty):
+                                    html_content += label_html
+                                    
                             html_content += "</div></body></html>"
                             
                             st.download_button(
                                 label="🖨️ Download Label HTML (Siap Print)",
                                 data=html_content,
-                                file_name=f"Label_Clearance_{store_code_input}.html",
+                                file_name=f"Label_Clearance_AutoQty_{store_code_input}.html",
                                 mime="text/html"
                             )
                         else:
@@ -382,10 +410,10 @@ elif menu_selection == "3. Portal Staff (Scanner)":
                 match_idx = df_current[df_current.astype(str).apply(lambda x: x.str.contains(scan_input, case=False)).any(axis=1)].index
                 if not match_idx.empty:
                     df_current.loc[match_idx, 'Status_Pengerjaan'] = "Selesai"
-                    df_current.loc[match_idx, 'Feedback_Staff'] = staff_note if staff_note else f"Selesai di-display"
+                    df_current.loc[match_idx, 'Feedback_Staff'] = staff_note if staff_note else f"Selesai (Diinput: {aktif_staff})"
                     st.session_state['processed_data'] = df_current
                     save_df('processed_data', df_current)
-                    st.success(f"✅ Artikel {scan_input} diselesaikan oleh {aktif_staff}!")
+                    st.success(f"✅ Artikel {scan_input} diselesaikan!")
                 else:
                     st.error("❌ Artikel tidak ditemukan.")
 
@@ -401,13 +429,12 @@ elif menu_selection == "4. Dashboard SL & MOD":
         st.warning("🔒 Halaman Terkunci. Masukkan PIN SL/MOD.")
         pin_input = st.text_input("PIN Akses:", type="password")
         if st.button("Login"):
-            # 3 PIN Otorisasi Khusus SL/MOD
             valid_pins = ["99231078", "99230454", "99250259"]
             if pin_input in valid_pins: 
                 st.session_state['auth_mod'] = True
                 st.rerun()
             else:
-                st.error("PIN Salah atau Tidak Terdaftar!")
+                st.error("PIN Salah!")
     else:
         if st.button("🔒 Logout"):
             st.session_state['auth_mod'] = False
@@ -424,8 +451,6 @@ elif menu_selection == "4. Dashboard SL & MOD":
             c1.metric("Total Tugas Item", total)
             c2.metric("Selesai Dikerjakan", selesai)
             c3.metric("Belum Dikerjakan", total - selesai)
-            
-            st.markdown("#### Detail Tabel Progress")
             
             art_col = next((c for c in df_dash.columns if 'article' in str(c).lower()), 'Article')
             desc_col = next((c for c in df_dash.columns if 'desc' in str(c).lower() and 'site' not in str(c).lower()), 'Description')
